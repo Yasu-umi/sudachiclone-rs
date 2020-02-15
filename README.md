@@ -4,7 +4,7 @@
 [![sudachiclone at docs.rs](https://docs.rs/sudachiclone/badge.svg)](https://docs.rs/sudachiclone)
 [![Actions Status](https://github.com/Yasu-umi/sudachiclone-rs/workflows/test/badge.svg)](https://github.com/Yasu-umi/sudachiclone-rs/actions)
 
-sudachiclone-rs is a Rsut version of [Sudachi](https://github.com/WorksApplications/sudachi), a Japanese morphological analyzer.
+sudachiclone-rs is a Rust version of [Sudachi](https://github.com/WorksApplications/sudachi), a Japanese morphological analyzer.
 
 ## Install CLI
 
