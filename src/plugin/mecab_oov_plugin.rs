@@ -61,8 +61,10 @@ pub enum MecabOovPluginSetupErr {
   IOError(#[from] IOError),
   #[error("{self:?}")]
   ParseIntError(#[from] ParseIntError),
-  #[error("invalid format at line {0}")]
-  InvalidFormatErr(usize),
+  #[error("invalid format at line {0} in char.def")]
+  InvalidCharFormatErr(usize),
+  #[error("invalid format at line {0} in unk.def")]
+  InvalidUnkFormatErr(usize),
   #[error("`{1}` is invalid type at line {0}")]
   InvalidTypeErr(usize, String),
   #[error("`{1}` is already defined at line {0}")]
@@ -104,7 +106,7 @@ impl MecabOovPlugin {
         }
         let cols: Vec<&str> = line.split_whitespace().collect();
         if cols.len() < 4 {
-          return Err(MecabOovPluginSetupErr::InvalidFormatErr(i));
+          return Err(MecabOovPluginSetupErr::InvalidCharFormatErr(i));
         }
         if let Ok(_type) = CategoryType::from_str(cols[0]) {
           if self.categories.contains_key(&_type) {
@@ -143,7 +145,7 @@ impl MecabOovPlugin {
         }
         let cols: Vec<&str> = line.split(',').collect();
         if cols.len() < 10 {
-          return Err(MecabOovPluginSetupErr::InvalidFormatErr(i));
+          return Err(MecabOovPluginSetupErr::InvalidUnkFormatErr(i));
         }
 
         if let Ok(_type) = CategoryType::from_str(cols[0]) {
