@@ -11,43 +11,43 @@
 //! for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::C), None).unwrap() {
 //!     println!("{}", m.surface());
 //! };
-//! # => 国家公務員
+//! // => 国家公務員
 //!
 //! for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::B), None).unwrap() {
 //!     println!("{}", m.surface());
 //! };
-//! # => 国家
-//! # => 公務員
+//! // => 国家
+//! // => 公務員
 //!
 //! for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::A), None).unwrap() {
 //!     println!("{}", m.surface());
 //! };
-//! # => 国家
-//! # => 公務
-//! # => 員
+//! // => 国家
+//! // => 公務
+//! // => 員
 //!
 //! // Morpheme information
 //!
 //! let m = tokenizer.tokenize("食べ", &Some(SplitMode::A), None).unwrap().get(0).unwrap();
 //! println!("{}", m.surface());
-//! # => 食べ
+//! // => 食べ
 //! println!("{}", m.dictionary_form());
-//! # => 食べる
+//! // => 食べる
 //! println!("{}", m.reading_form());
-//! # => タベ
+//! // => タベ
 //! println!("{:?}", m.part_of_speech());
-//! # => ["動詞", "一般", "*", "*", "下一段-バ行", "連用形-一般"]
+//! // => ["動詞", "一般", "*", "*", "下一段-バ行", "連用形-一般"]
 //!
 //! // Normalization
 //!
 //! println!("{}", tokenizer.tokenize("附属", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
-//! # => 付属
+//! // => 付属
 //!
 //! println!("{}", tokenizer.tokenize("SUMMER", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
-//! # => サマー
+//! // => サマー
 //!
 //! println!("{}", tokenizer.tokenize("シュミレーション", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
-//! # => シミュレーション
+//! // => シミュレーション
 //! ```
 
 #![crate_name = "sudachiclone"]

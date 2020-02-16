@@ -7,7 +7,7 @@ repository = "https://github.com/Yasu-umi/sudachiclone-rs"
 authors = ["Yasu_umiNishikawa <yasu.umi.19910101@gmail.com>"]
 categories = ["text-processing"]
 keywords = ["japanese", "analyzer", "morphological", "sudachi"]
-description = "sudachiclone-rs is a Rsut version of Sudachi, a Japanese morphological analyzer."
+description = "sudachiclone-rs is a Rust version of Sudachi, a Japanese morphological analyzer."
 edition = "2018"
 
 [dependencies]
