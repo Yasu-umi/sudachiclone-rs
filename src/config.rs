@@ -39,10 +39,15 @@ impl Config {
   pub fn empty() -> Result<Config, ConfigErr> {
     let here = String::from_utf8(Command::new("which").arg("sudachiclone").output()?.stdout)?;
     let dir = ok_or_io_err(
-      PathBuf::from_str(&here)?.parent().as_ref(),
+      PathBuf::from_str(&here)?
+        .parent()
+        .map(|p| p.to_path_buf())
+        .or_else(|| match PathBuf::from_str(file!()) {
+          Ok(p) => p.parent().map(|p| p.to_path_buf()),
+          Err(_) => None,
+        }),
       "NotFoundParentDir",
-    )?
-    .to_path_buf();
+    )?;
     Ok(Config {
       settings: Value::Null,
       DEFAULT_RESOURCEDIR: dir.join("resources"),
