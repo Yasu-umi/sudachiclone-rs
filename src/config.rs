@@ -77,22 +77,26 @@ impl Config {
   }
   pub fn system_dict_path(&mut self) -> Result<PathBuf, SudachiDictErr> {
     if let Some(Value::String(p)) = self.settings.get("systemDict") {
-      Ok(self.resource_dir.join(p))
-    } else {
-      let dict_path = create_default_link_for_sudachidict_core()?;
-      self.settings.as_object_mut().unwrap().insert(
-        String::from("systemDict"),
-        Value::String(dict_path.to_str().unwrap().to_string()),
-      );
-      Ok(dict_path)
+      let path = self.resource_dir.join(p);
+      if path.exists() {
+        return Ok(path);
+      }
     }
+    let dict_path = create_default_link_for_sudachidict_core()?;
+    self.settings.as_object_mut().unwrap().insert(
+      String::from("systemDict"),
+      Value::String(dict_path.to_str().unwrap().to_string()),
+    );
+    Ok(dict_path)
   }
   pub fn char_def_path(&self) -> Result<PathBuf, ConfigErr> {
     if let Some(Value::String(p)) = self.settings.get("characterDefinitionFile") {
-      Ok(self.resource_dir.join(p))
-    } else {
-      Err(ConfigErr::CharDefiFileNotFoundError)
+      let path = self.resource_dir.join(p);
+      if path.exists() {
+        return Ok(path);
+      }
     }
+    Err(ConfigErr::CharDefiFileNotFoundError)
   }
   pub fn user_dict_paths(&self) -> Vec<PathBuf> {
     let mut paths = vec![];
