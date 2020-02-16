@@ -33,6 +33,14 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Cache pip
+        uses: actions/cache@v1
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install clippy
         run: rustup component add clippy
 
@@ -50,6 +58,16 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
+
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+
+      - name: Install dictionary (for docs test)
+        run: |
+          python -m pip install --upgrade pip
+          pip install https://object-storage.tyo2.conoha.io/v1/nc_2520839e1f9641b08211a5c85243124a/sudachi/SudachiDict_core-20200127.tar.gz
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1

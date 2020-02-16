@@ -1,4 +1,4 @@
-//! ```edition2018
+//! ```
 //! use sudachiclone::prelude::*;
 //!
 //! let dictionary = Dictionary::new(None, None).unwrap();
