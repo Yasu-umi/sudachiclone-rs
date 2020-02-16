@@ -57,7 +57,7 @@ fn get_oov_provider_plugin(
   if let Some(Value::String(class)) = json_obj.get("class") {
     if class == "sudachipy.plugin.oov.SimpleOovProviderPlugin" {
       Ok(Box::new(SimpleOovPlugin::new(json_obj)))
-    } else if class == "sudachipy.plugin.oov.MecabOovProviderPlugin" {
+    } else if class == "sudachipy.plugin.oov.MeCabOovProviderPlugin" {
       Ok(Box::new(MecabOovPlugin::new(
         &config.resource_dir,
         json_obj,
