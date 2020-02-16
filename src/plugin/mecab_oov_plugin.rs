@@ -101,7 +101,7 @@ impl MecabOovPlugin {
         let i = i + 1;
         let line = line?;
         let line = line.trim();
-        if !line.is_empty() || line.starts_with('#') || line.starts_with("0x") {
+        if line.is_empty() || line.starts_with('#') || line.starts_with("0x") {
           continue;
         }
         let cols: Vec<&str> = line.split_whitespace().collect();
