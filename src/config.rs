@@ -176,20 +176,18 @@ fn unlink_default_dict_package() -> Result<(), SudachiDictErr> {
     .and_then(|x| x)
   {
     let dst_path = dst_path.trim();
-    if symlink_metadata(&dst_path)?.file_type().is_symlink() {
-      println!("unlinkng sudachidict");
-      remove_symlink_dir(&dst_path)?;
-      println!("sudachidict unlinked");
+    if !dst_path.is_empty() {
+      if symlink_metadata(&dst_path)?.file_type().is_symlink() {
+        remove_symlink_dir(&dst_path)?;
+      }
+      return if Path::new(&dst_path).exists() {
+        Err(SudachiDictErr::UnlinkFaildErr)
+      } else {
+        Ok(())
+      };
     }
-    if Path::new(&dst_path).exists() {
-      Err(SudachiDictErr::UnlinkFaildErr)
-    } else {
-      Ok(())
-    }
-  } else {
-    println!("sudachidict not exists");
-    Ok(())
   }
+  Ok(())
 }
 
 fn set_default_dict_package(dict_pkg_name: &str) -> Result<String, SudachiDictErr> {
