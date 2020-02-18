@@ -203,10 +203,10 @@ mod tests {
   }
   impl MockGrammar {
     fn new() -> MockGrammar {
-      let mut character_category = CharacterCategory::default();
-      character_category
-        .read_character_definition(resources_test_dir().join("char.def").as_path())
-        .unwrap();
+      let character_category = CharacterCategory::read_character_definition(
+        resources_test_dir().join("char.def").as_path(),
+      )
+      .unwrap();
       MockGrammar {
         character_category: Some(character_category),
       }

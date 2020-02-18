@@ -149,8 +149,7 @@ impl Dictionary {
   pub fn read_character_definition<P: AsRef<Path>>(
     filename: P,
   ) -> Result<CharacterCategory, ReadCharacterDefinitionErr> {
-    let mut char_category = CharacterCategory::default();
-    char_category.read_character_definition(&filename)?;
+    let char_category = CharacterCategory::read_character_definition(&filename)?;
     Ok(char_category)
   }
 }

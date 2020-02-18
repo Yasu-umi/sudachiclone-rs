@@ -230,16 +230,14 @@ mod tests {
   }
 
   fn build_builder() -> UTF8InputTextBuilder<Rc<RefCell<MockGrammar>>> {
-    let mut character_category = CharacterCategory::default();
-    character_category
-      .read_character_definition(
-        PathBuf::from_str(file!())
-          .unwrap()
-          .parent()
-          .unwrap()
-          .join("resources/char.def"),
-      )
-      .unwrap();
+    let character_category = CharacterCategory::read_character_definition(
+      PathBuf::from_str(file!())
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("resources/char.def"),
+    )
+    .unwrap();
     let mut grammar = MockGrammar::new();
     grammar.set_character_category(Some(character_category));
     UTF8InputTextBuilder::new(TEXT, Rc::new(RefCell::new(grammar)))
