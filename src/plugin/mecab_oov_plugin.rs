@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IOError};
 use std::num::ParseIntError;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -75,11 +75,12 @@ pub enum MecabOovPluginSetupErr {
 }
 
 impl MecabOovPlugin {
-  pub fn setup(
-    resource_dir: &PathBuf,
+  pub fn setup<P: AsRef<Path>>(
+    resource_dir: P,
     json_obj: &Value,
     grammar: Rc<RefCell<Grammar>>,
   ) -> Result<MecabOovPlugin, MecabOovPluginSetupErr> {
+    let resource_dir = resource_dir.as_ref();
     let chardef_path = json_obj
       .get("charDef")
       .map(|i| i.as_str())

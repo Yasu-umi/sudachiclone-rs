@@ -5,9 +5,8 @@ use std::convert::Infallible;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IOError};
 use std::marker::PhantomData;
-use std::path::PathBuf;
+use std::path::Path;
 use std::rc::Rc;
-use std::str::FromStr;
 
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
@@ -119,14 +118,7 @@ impl<G> DefaultInputTextPlugin<G> {
   pub fn setup(
     config: &Config,
   ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
-    let rewrite_def_path = PathBuf::from_str(
-      config
-        .resource_dir
-        .clone()
-        .join("rewrite.def")
-        .to_str()
-        .unwrap(),
-    )?;
+    let rewrite_def_path = config.resource_dir.clone().join("rewrite.def");
     DefaultInputTextPlugin::read_rewrite_lists(rewrite_def_path)
   }
   pub fn read_rewrite_lists_from_reader<R: BufRead>(
@@ -172,8 +164,8 @@ impl<G> DefaultInputTextPlugin<G> {
       ignore_normalize_set,
     })
   }
-  pub fn read_rewrite_lists(
-    rewrite_def_path: PathBuf,
+  pub fn read_rewrite_lists<P: AsRef<Path>>(
+    rewrite_def_path: P,
   ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
     let mut reader = BufReader::new(File::open(rewrite_def_path)?);
     DefaultInputTextPlugin::read_rewrite_lists_from_reader(&mut reader)
