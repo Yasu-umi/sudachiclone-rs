@@ -119,9 +119,9 @@ impl<G> DefaultInputTextPlugin<G> {
     config: &Config,
   ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
     let rewrite_def_path = config.resource_dir.clone().join("rewrite.def");
-    DefaultInputTextPlugin::read_rewrite_lists(rewrite_def_path)
+    DefaultInputTextPlugin::from_filepath(rewrite_def_path)
   }
-  pub fn read_rewrite_lists_from_reader<R: BufRead>(
+  pub fn from_reader<R: BufRead>(
     reader: &mut R,
   ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
     let mut key_lengths = HashMap::new();
@@ -164,11 +164,11 @@ impl<G> DefaultInputTextPlugin<G> {
       ignore_normalize_set,
     })
   }
-  pub fn read_rewrite_lists<P: AsRef<Path>>(
+  pub fn from_filepath<P: AsRef<Path>>(
     rewrite_def_path: P,
   ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
     let mut reader = BufReader::new(File::open(rewrite_def_path)?);
-    DefaultInputTextPlugin::read_rewrite_lists_from_reader(&mut reader)
+    DefaultInputTextPlugin::from_reader(&mut reader)
   }
 }
 
@@ -295,10 +295,9 @@ mod tests {
   fn test_invalid_format_ignorelist() {
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_ignorelist.def");
     let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
-    let err =
-      DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::read_rewrite_lists_from_reader(&mut reader)
-        .err()
-        .unwrap();
+    let err = DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::from_reader(&mut reader)
+      .err()
+      .unwrap();
     assert_eq!("12 is not character at line 1", format!("{}", err));
   }
 
@@ -306,10 +305,9 @@ mod tests {
   fn test_invalid_format_replacelist() {
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_replacelist.def");
     let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
-    let err =
-      DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::read_rewrite_lists_from_reader(&mut reader)
-        .err()
-        .unwrap();
+    let err = DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::from_reader(&mut reader)
+      .err()
+      .unwrap();
     assert_eq!("invalid format at line 1", format!("{}", err));
   }
 
@@ -317,10 +315,9 @@ mod tests {
   fn test_duplicated_lines_replacelist() {
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_dup.def");
     let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
-    let err =
-      DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::read_rewrite_lists_from_reader(&mut reader)
-        .err()
-        .unwrap();
+    let err = DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::from_reader(&mut reader)
+      .err()
+      .unwrap();
     assert_eq!("12 is already defined at line 2", format!("{}", err));
   }
 }
