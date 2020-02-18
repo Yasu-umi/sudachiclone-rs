@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::ops::Deref;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use log::{info, log_enabled, set_boxed_logger, Level, Log};
 
@@ -10,9 +9,9 @@ use super::dictionary_lib::lexicon_set::LexiconSet;
 use super::lattice::Lattice;
 use super::lattice_node::LatticeNode;
 use super::morpheme_list::MorphemeList;
-use super::plugin::input_text_plugin::InputTextPlugin;
+use super::plugin::input_text_plugin::{InputTextPlugin, RewriteInputText};
 use super::plugin::oov_provider_plugin::{get_oov, OovProviderPlugin};
-use super::plugin::path_rewrite_plugin::PathRewritePlugin;
+use super::plugin::path_rewrite_plugin::{PathRewritePlugin, RewritePath};
 use super::utf8_input_text::{InputText, UTF8InputText};
 use super::utf8_input_text_builder::UTF8InputTextBuilder;
 
@@ -33,20 +32,20 @@ pub enum SplitMode {
 }
 
 pub struct Tokenizer {
-  grammar: Rc<RefCell<Grammar>>,
-  lexicon_set: Rc<RefCell<LexiconSet>>,
-  input_text_plugins: Rc<Vec<Box<dyn InputTextPlugin>>>,
-  oov_provider_plugins: Rc<Vec<Box<dyn OovProviderPlugin>>>,
-  path_rewrite_plugins: Rc<Vec<Box<dyn PathRewritePlugin>>>,
+  grammar: Arc<Mutex<Grammar>>,
+  lexicon_set: Arc<Mutex<LexiconSet>>,
+  input_text_plugins: Arc<Vec<InputTextPlugin>>,
+  oov_provider_plugins: Arc<Vec<OovProviderPlugin>>,
+  path_rewrite_plugins: Arc<Vec<PathRewritePlugin>>,
 }
 
 impl Tokenizer {
   pub fn new(
-    grammar: Rc<RefCell<Grammar>>,
-    lexicon_set: Rc<RefCell<LexiconSet>>,
-    input_text_plugins: Rc<Vec<Box<dyn InputTextPlugin>>>,
-    oov_provider_plugins: Rc<Vec<Box<dyn OovProviderPlugin>>>,
-    path_rewrite_plugins: Rc<Vec<Box<dyn PathRewritePlugin>>>,
+    grammar: Arc<Mutex<Grammar>>,
+    lexicon_set: Arc<Mutex<LexiconSet>>,
+    input_text_plugins: Arc<Vec<InputTextPlugin>>,
+    oov_provider_plugins: Arc<Vec<OovProviderPlugin>>,
+    path_rewrite_plugins: Arc<Vec<PathRewritePlugin>>,
   ) -> Tokenizer {
     Tokenizer {
       grammar,
@@ -57,7 +56,7 @@ impl Tokenizer {
     }
   }
   fn build_lattice(&self, input: &UTF8InputText) -> Lattice {
-    let mut lattice = Lattice::new(Rc::clone(&self.grammar));
+    let mut lattice = Lattice::new(Arc::clone(&self.grammar));
     let bytes = input.get_byte_text();
     let len = bytes.len();
     lattice.resize(len);
@@ -66,20 +65,20 @@ impl Tokenizer {
         continue;
       }
       let mut has_words = false;
-      let lexicon_set = self.lexicon_set.borrow();
+      let lexicon_set = self.lexicon_set.lock().unwrap();
       for (word_id, end) in lexicon_set.lookup(bytes, i) {
         if end < len && !input.can_bow(end) {
           continue;
         }
         has_words = true;
         let node = LatticeNode::new(
-          Some(Rc::clone(&self.lexicon_set)),
+          Some(Arc::clone(&self.lexicon_set)),
           lexicon_set.get_left_id(word_id) as u32,
           lexicon_set.get_right_id(word_id) as u32,
           lexicon_set.get_cost(word_id) as i32,
           word_id,
         );
-        lattice.insert(i, end, Rc::new(RefCell::new(node)));
+        lattice.insert(i, end, Arc::new(Mutex::new(node)));
       }
       // OOV
       if !input
@@ -104,26 +103,26 @@ impl Tokenizer {
   }
   fn split_path(
     &self,
-    path: Vec<Rc<RefCell<LatticeNode>>>,
+    path: Vec<Arc<Mutex<LatticeNode>>>,
     mode: &SplitMode,
-  ) -> Vec<Rc<RefCell<LatticeNode>>> {
+  ) -> Vec<Arc<Mutex<LatticeNode>>> {
     if mode == &SplitMode::C {
       return path;
     }
     let mut new_path = vec![];
     for node in path {
       let word_ids = if mode == &SplitMode::A {
-        node.borrow().get_word_info().a_unit_split
+        node.lock().unwrap().get_word_info().a_unit_split
       } else {
-        node.borrow().get_word_info().b_unit_split
+        node.lock().unwrap().get_word_info().b_unit_split
       };
       if word_ids.len() <= 1 {
         new_path.push(node);
       } else {
-        let mut offset = node.borrow().get_start();
+        let mut offset = node.lock().unwrap().get_start();
         for word_id in word_ids {
           let mut node = LatticeNode::new(
-            Some(Rc::clone(&self.lexicon_set)),
+            Some(Arc::clone(&self.lexicon_set)),
             0,
             0,
             0,
@@ -132,7 +131,7 @@ impl Tokenizer {
           node.start = offset;
           offset += node.get_word_info().head_word_length;
           node.end = offset;
-          new_path.push(Rc::new(RefCell::new(node)));
+          new_path.push(Arc::new(Mutex::new(node)));
         }
       }
     }
@@ -166,7 +165,7 @@ impl CanTokenize for Tokenizer {
     }
 
     let mode = mode.as_ref().unwrap_or(&SplitMode::C);
-    let mut builder = UTF8InputTextBuilder::new(text.as_ref(), Rc::clone(&self.grammar));
+    let mut builder = UTF8InputTextBuilder::new(text.as_ref(), Arc::clone(&self.grammar));
     for plugin in self.input_text_plugins.iter() {
       if plugin.rewrite(&mut builder).is_err() {
         return None;
@@ -193,12 +192,12 @@ impl CanTokenize for Tokenizer {
     log_path(&path);
     info!("===");
 
-    Some(MorphemeList::new(input, Rc::clone(&self.grammar), path))
+    Some(MorphemeList::new(input, Arc::clone(&self.grammar), path))
   }
 }
 
 fn process_oov(
-  oov_plugin: &dyn OovProviderPlugin,
+  oov_plugin: &OovProviderPlugin,
   input: &UTF8InputText,
   i: usize,
   has_words: &mut bool,
@@ -207,19 +206,19 @@ fn process_oov(
   for node in get_oov(oov_plugin, input, i, *has_words) {
     *has_words = true;
     let (start, end) = {
-      let _node = node.borrow();
+      let _node = node.lock().unwrap();
       (_node.get_start(), _node.get_end())
     };
     lattice.insert(start, end, node);
   }
 }
 
-fn log_path(path: &[Rc<RefCell<LatticeNode>>]) {
+fn log_path(path: &[Arc<Mutex<LatticeNode>>]) {
   if !log_enabled!(Level::Info) {
     return;
   }
   for (i, node) in path.iter().enumerate() {
-    info!("{}: {:?}￿", i, node.borrow());
+    info!("{}: {:?}￿", i, node.lock().unwrap());
   }
 }
 
@@ -264,12 +263,20 @@ mod tests {
     let morpheme_list = tokenizer.tokenize("京都", &None, None).unwrap();
     assert_eq!(1, morpheme_list.len());
     let pid = morpheme_list.get(0).unwrap().part_of_speech_id() as usize;
-    assert!(dictionary.get_grammar().borrow().get_part_of_speech_size() > pid);
+    assert!(
+      dictionary
+        .get_grammar()
+        .lock()
+        .unwrap()
+        .get_part_of_speech_size()
+        > pid
+    );
     assert_eq!(
       &morpheme_list.get(0).unwrap().part_of_speech(),
       dictionary
         .get_grammar()
-        .borrow()
+        .lock()
+        .unwrap()
         .get_part_of_speech_string(pid)
     );
   }

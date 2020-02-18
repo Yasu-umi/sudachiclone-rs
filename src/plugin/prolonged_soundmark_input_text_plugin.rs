@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
-use super::input_text_plugin::{InputTextPlugin, InputTextPluginReplaceErr};
+use super::input_text_plugin::{InputTextPluginReplaceErr, RewriteInputText};
 use crate::utf8_input_text_builder::UTF8InputTextBuilder;
 
 #[derive(Debug)]
@@ -11,8 +11,8 @@ pub struct ProlongedSoundMarkInputTextPlugin {
   replace_symbol: String,
 }
 
-impl<G> InputTextPlugin<G> for ProlongedSoundMarkInputTextPlugin {
-  fn rewrite(
+impl RewriteInputText for &ProlongedSoundMarkInputTextPlugin {
+  fn rewrite<G>(
     &self,
     builder: &mut UTF8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr> {
@@ -71,10 +71,9 @@ mod tests {
   use crate::dictionary_lib::character_category::CharacterCategory;
   use crate::dictionary_lib::grammar::{GetCharacterCategory, SetCharacterCategory};
   use serde_json::json;
-  use std::cell::RefCell;
   use std::path::PathBuf;
-  use std::rc::Rc;
   use std::str::FromStr;
+  use std::sync::{Arc, Mutex};
 
   struct MockGrammar {
     character_category: Option<CharacterCategory>,
@@ -116,9 +115,8 @@ mod tests {
   fn test_combine_continuous_prolonged_sound_mark() {
     let original = "ゴーール";
     let normalized = "ゴール";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -141,9 +139,8 @@ mod tests {
   fn test_combined_continuous_prolonged_sound_marks_at_end() {
     let original = "スーパーー";
     let normalized = "スーパー";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -167,9 +164,8 @@ mod tests {
   fn test_combine_continuous_prolonged_sound_marks_multi_times() {
     let original = "エーービーーーシーーーー";
     let normalized = "エービーシー";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -198,9 +194,8 @@ mod tests {
   fn test_combine_continuous_prolonged_sound_marks_multi_symbol_types() {
     let original = "エーービ〜〜〜シ〰〰〰〰";
     let normalized = "エービーシー";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 

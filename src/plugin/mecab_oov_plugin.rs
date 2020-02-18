@@ -1,16 +1,15 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IOError};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 use thiserror::Error;
 
-use super::oov_provider_plugin::OovProviderPlugin;
+use super::oov_provider_plugin::ProvideOov;
 use crate::dictionary_lib::category_type::CategoryType;
 use crate::dictionary_lib::grammar::{GetPartOfSpeech, Grammar};
 use crate::dictionary_lib::word_info::WordInfo;
@@ -78,7 +77,7 @@ impl MecabOovPlugin {
   pub fn setup<P: AsRef<Path>>(
     resource_dir: P,
     json_obj: &Value,
-    grammar: Rc<RefCell<Grammar>>,
+    grammar: Arc<Mutex<Grammar>>,
   ) -> Result<MecabOovPlugin, MecabOovPluginSetupErr> {
     let resource_dir = resource_dir.as_ref();
     let chardef_path = json_obj
@@ -151,10 +150,10 @@ impl MecabOovPlugin {
   fn read_oov_from_reader<R: BufRead>(
     reader: &mut R,
     categories: &Categories,
-    grammar: Rc<RefCell<Grammar>>,
+    grammar: Arc<Mutex<Grammar>>,
   ) -> Result<OovsList, MecabOovPluginSetupErr> {
     let mut oovs_list: OovsList = HashMap::new();
-    let grammar = RefCell::borrow(&grammar);
+    let grammar = grammar.lock().unwrap();
     for (i, line) in reader.lines().enumerate() {
       let i = i + 1;
       let line = line?;
@@ -198,7 +197,7 @@ impl MecabOovPlugin {
   fn read_oov(
     unkdef_path: Option<PathBuf>,
     categories: &Categories,
-    grammar: Rc<RefCell<Grammar>>,
+    grammar: Arc<Mutex<Grammar>>,
   ) -> Result<OovsList, MecabOovPluginSetupErr> {
     if let Some(unkdef_path) = unkdef_path {
       let mut reader = BufReader::new(File::open(unkdef_path)?);
@@ -208,7 +207,7 @@ impl MecabOovPlugin {
     }
   }
 
-  fn get_oov_node(&self, text: &str, oov: &Oov, len: usize) -> Rc<RefCell<LatticeNode>> {
+  fn get_oov_node(&self, text: &str, oov: &Oov, len: usize) -> Arc<Mutex<LatticeNode>> {
     let mut node = LatticeNode::empty(oov.left_id, oov.right_id, oov.cost);
     node.set_oov();
     let info = WordInfo {
@@ -224,17 +223,17 @@ impl MecabOovPlugin {
       word_structure: vec![],
     };
     node.set_word_info(info);
-    Rc::new(RefCell::new(node))
+    Arc::new(Mutex::new(node))
   }
 }
 
-impl<T: InputText> OovProviderPlugin<T> for MecabOovPlugin {
+impl<T: InputText> ProvideOov<T> for &MecabOovPlugin {
   fn provide_oov(
     &self,
     input_text: &T,
     offset: usize,
     has_other_words: bool,
-  ) -> Vec<Rc<RefCell<LatticeNode>>> {
+  ) -> Vec<Arc<Mutex<LatticeNode>>> {
     let len = input_text.get_char_category_continuous_length(offset);
     let mut nodes = vec![];
     if len < 1 {
@@ -368,9 +367,9 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(0, nodes.len());
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -385,9 +384,9 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(0, nodes.len());
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -402,15 +401,15 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(1, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -425,15 +424,15 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(1, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(1, nodes.len());
   }
 
@@ -448,20 +447,20 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(2, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あ", node.get_word_info().surface);
     assert_eq!(1, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[1]);
+    let node = nodes[1].lock().unwrap();
     assert_eq!("あい", node.get_word_info().surface);
     assert_eq!(2, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -476,25 +475,25 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(3, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[1]);
+    let node = nodes[1].lock().unwrap();
     assert_eq!("あ", node.get_word_info().surface);
     assert_eq!(1, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[2]);
+    let node = nodes[2].lock().unwrap();
     assert_eq!("あい", node.get_word_info().surface);
     assert_eq!(2, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -509,25 +508,25 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(3, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[1]);
+    let node = nodes[1].lock().unwrap();
     assert_eq!("あ", node.get_word_info().surface);
     assert_eq!(1, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[2]);
+    let node = nodes[2].lock().unwrap();
     assert_eq!("あい", node.get_word_info().surface);
     assert_eq!(2, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(3, nodes.len());
   }
 }

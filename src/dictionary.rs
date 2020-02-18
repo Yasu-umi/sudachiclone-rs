@@ -1,7 +1,6 @@
-use std::cell::RefCell;
 use std::io::Error as IOError;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use thiserror::Error;
 
@@ -39,13 +38,13 @@ pub enum DictionaryErr {
   ReadCharacterDefinitionErr(#[from] ReadCharacterDefinitionErr),
 }
 
-type InputTextPlugins = Rc<Vec<Box<dyn InputTextPlugin>>>;
-type OovProviderPlugins = Rc<Vec<Box<dyn OovProviderPlugin>>>;
-type PathRewritePlugins = Rc<Vec<Box<dyn PathRewritePlugin>>>;
+type InputTextPlugins = Arc<Vec<InputTextPlugin>>;
+type OovProviderPlugins = Arc<Vec<OovProviderPlugin>>;
+type PathRewritePlugins = Arc<Vec<PathRewritePlugin>>;
 
 pub struct Dictionary {
-  grammar: Rc<RefCell<Grammar>>,
-  lexicon_set: Rc<RefCell<LexiconSet>>,
+  grammar: Arc<Mutex<Grammar>>,
+  lexicon_set: Arc<Mutex<LexiconSet>>,
   input_text_plugins: InputTextPlugins,
   oov_provider_plugins: OovProviderPlugins,
   path_rewrite_plugins: PathRewritePlugins,
@@ -53,22 +52,22 @@ pub struct Dictionary {
 
 impl Dictionary {
   pub fn new(
-    grammar: &Rc<RefCell<Grammar>>,
-    lexicon_set: &Rc<RefCell<LexiconSet>>,
+    grammar: &Arc<Mutex<Grammar>>,
+    lexicon_set: &Arc<Mutex<LexiconSet>>,
     input_text_plugins: &InputTextPlugins,
     oov_provider_plugins: &OovProviderPlugins,
     path_rewrite_plugins: &PathRewritePlugins,
   ) -> Dictionary {
     Dictionary {
-      grammar: Rc::clone(grammar),
-      lexicon_set: Rc::clone(lexicon_set),
-      input_text_plugins: Rc::clone(input_text_plugins),
-      oov_provider_plugins: Rc::clone(oov_provider_plugins),
-      path_rewrite_plugins: Rc::clone(path_rewrite_plugins),
+      grammar: Arc::clone(grammar),
+      lexicon_set: Arc::clone(lexicon_set),
+      input_text_plugins: Arc::clone(input_text_plugins),
+      oov_provider_plugins: Arc::clone(oov_provider_plugins),
+      path_rewrite_plugins: Arc::clone(path_rewrite_plugins),
     }
   }
-  pub fn get_grammar(&self) -> Rc<RefCell<Grammar>> {
-    Rc::clone(&self.grammar)
+  pub fn get_grammar(&self) -> Arc<Mutex<Grammar>> {
+    Arc::clone(&self.grammar)
   }
   pub fn setup(
     config_path: Option<&str>,
@@ -82,32 +81,36 @@ impl Dictionary {
       .grammar
       .set_character_category(Some(char_category));
 
-    let lexicon_set = Rc::new(RefCell::new(LexiconSet::new(system_dictionary.lexicon)));
-    let grammar = Rc::new(RefCell::new(system_dictionary.grammar));
+    let lexicon_set = Arc::new(Mutex::new(LexiconSet::new(system_dictionary.lexicon)));
+    let grammar = Arc::new(Mutex::new(system_dictionary.grammar));
 
-    let input_text_plugins = Rc::new(get_input_text_plugins(&config)?);
+    let input_text_plugins = Arc::new(get_input_text_plugins(&config)?);
 
-    let oov_provider_plugins = Rc::new(get_oov_provider_plugins(&config, Rc::clone(&grammar))?);
+    let oov_provider_plugins = Arc::new(get_oov_provider_plugins(&config, Arc::clone(&grammar))?);
 
-    let path_rewrite_plugins: Vec<Box<dyn PathRewritePlugin>> = vec![];
-    let path_rewrite_plugins = Rc::new(path_rewrite_plugins);
+    let path_rewrite_plugins: Vec<PathRewritePlugin> = vec![];
+    let path_rewrite_plugins = Arc::new(path_rewrite_plugins);
 
     for user_dict_path in config.user_dict_paths() {
       let user_dictionary = Dictionary::read_user_dictionary(user_dict_path, &lexicon_set)?;
 
       let mut user_lexicon = user_dictionary.lexicon;
       let tokenizer = Tokenizer::new(
-        Rc::clone(&grammar),
-        Rc::clone(&lexicon_set),
-        Rc::clone(&input_text_plugins),
-        Rc::clone(&oov_provider_plugins),
-        Rc::new(vec![]),
+        Arc::clone(&grammar),
+        Arc::clone(&lexicon_set),
+        Arc::clone(&input_text_plugins),
+        Arc::clone(&oov_provider_plugins),
+        Arc::new(vec![]),
       );
       user_lexicon.calculate_cost(&tokenizer);
-      lexicon_set
-        .borrow_mut()
-        .add(user_lexicon, grammar.borrow().get_part_of_speech_size());
-      grammar.borrow_mut().add_pos_list(&user_dictionary.grammar);
+      lexicon_set.lock().unwrap().add(
+        user_lexicon,
+        grammar.lock().unwrap().get_part_of_speech_size(),
+      );
+      grammar
+        .lock()
+        .unwrap()
+        .add_pos_list(&user_dictionary.grammar);
     }
 
     Ok(Dictionary::new(
@@ -121,11 +124,11 @@ impl Dictionary {
 
   pub fn create(&self) -> Tokenizer {
     Tokenizer::new(
-      Rc::clone(&self.grammar),
-      Rc::clone(&self.lexicon_set),
-      Rc::clone(&self.input_text_plugins),
-      Rc::clone(&self.oov_provider_plugins),
-      Rc::clone(&self.path_rewrite_plugins),
+      Arc::clone(&self.grammar),
+      Arc::clone(&self.lexicon_set),
+      Arc::clone(&self.input_text_plugins),
+      Arc::clone(&self.oov_provider_plugins),
+      Arc::clone(&self.path_rewrite_plugins),
     )
   }
 
@@ -137,9 +140,9 @@ impl Dictionary {
 
   pub fn read_user_dictionary<P: AsRef<Path>>(
     filename: P,
-    lexicon_set: &Rc<RefCell<LexiconSet>>,
+    lexicon_set: &Arc<Mutex<LexiconSet>>,
   ) -> Result<BinaryDictionary, DictionaryErr> {
-    if lexicon_set.borrow().is_full() {
+    if lexicon_set.lock().unwrap().is_full() {
       return Err(DictionaryErr::TooManyDictionariesErr);
     }
     let user_dictionary = BinaryDictionary::from_user_dictionary(filename)?;

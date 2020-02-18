@@ -1,34 +1,29 @@
-use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IOError};
-use std::marker::PhantomData;
 use std::path::Path;
-use std::rc::Rc;
 
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
 
-use super::input_text_plugin::{InputTextPlugin, InputTextPluginReplaceErr};
+use super::input_text_plugin::{InputTextPluginReplaceErr, RewriteInputText};
 use crate::config::Config;
-use crate::dictionary_lib::grammar::Grammar;
 use crate::utf8_input_text_builder::UTF8InputTextBuilder;
 
 type KeyLengths = HashMap<char, usize>;
 type ReplaceCharMap = HashMap<Vec<u8>, String>;
 type IgnoreNormalizeSet = HashSet<String>;
 
-pub struct DefaultInputTextPlugin<G = Rc<RefCell<Grammar>>> {
-  phantom: PhantomData<G>,
+pub struct DefaultInputTextPlugin {
   key_lengths: KeyLengths,
   replace_char_map: ReplaceCharMap,
   ignore_normalize_set: IgnoreNormalizeSet,
 }
 
-impl<G> InputTextPlugin<G> for DefaultInputTextPlugin<G> {
-  fn rewrite(
+impl RewriteInputText for DefaultInputTextPlugin {
+  fn rewrite<G>(
     &self,
     builder: &mut UTF8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr> {
@@ -114,16 +109,14 @@ pub enum DefaultInputTextPluginSetupErr {
   Infallible(#[from] Infallible),
 }
 
-impl<G> DefaultInputTextPlugin<G> {
-  pub fn setup(
-    config: &Config,
-  ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
+impl DefaultInputTextPlugin {
+  pub fn setup(config: &Config) -> Result<DefaultInputTextPlugin, DefaultInputTextPluginSetupErr> {
     let rewrite_def_path = config.resource_dir.clone().join("rewrite.def");
     DefaultInputTextPlugin::from_filepath(rewrite_def_path)
   }
   pub fn from_reader<R: BufRead>(
     reader: &mut R,
-  ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
+  ) -> Result<DefaultInputTextPlugin, DefaultInputTextPluginSetupErr> {
     let mut key_lengths = HashMap::new();
     let mut ignore_normalize_set = HashSet::new();
     let mut replace_char_map = HashMap::new();
@@ -158,7 +151,6 @@ impl<G> DefaultInputTextPlugin<G> {
       }
     }
     Ok(DefaultInputTextPlugin {
-      phantom: PhantomData,
       key_lengths,
       replace_char_map,
       ignore_normalize_set,
@@ -166,7 +158,7 @@ impl<G> DefaultInputTextPlugin<G> {
   }
   pub fn from_filepath<P: AsRef<Path>>(
     rewrite_def_path: P,
-  ) -> Result<DefaultInputTextPlugin<G>, DefaultInputTextPluginSetupErr> {
+  ) -> Result<DefaultInputTextPlugin, DefaultInputTextPluginSetupErr> {
     let mut reader = BufReader::new(File::open(rewrite_def_path)?);
     DefaultInputTextPlugin::from_reader(&mut reader)
   }
@@ -179,10 +171,9 @@ mod tests {
   use crate::config::Config;
   use crate::dictionary_lib::character_category::CharacterCategory;
   use crate::dictionary_lib::grammar::{GetCharacterCategory, SetCharacterCategory};
-  use std::cell::RefCell;
   use std::path::PathBuf;
-  use std::rc::Rc;
   use std::str::FromStr;
+  use std::sync::{Arc, Mutex};
 
   fn resources_test_dir() -> PathBuf {
     PathBuf::from_str(file!())
@@ -196,7 +187,7 @@ mod tests {
 
   const ORIGINAL_TEXT: &str = "ÂＢΓД㈱ｶﾞウ゛⼼Ⅲ";
   const NORMALIZED_TEXT: &str = "âbγд(株)ガヴ⼼ⅲ";
-  type CelledMockGrammar = Rc<RefCell<MockGrammar>>;
+  type CelledMockGrammar = Arc<Mutex<MockGrammar>>;
 
   struct MockGrammar {
     character_category: Option<CharacterCategory>,
@@ -225,10 +216,10 @@ mod tests {
 
   fn setup() -> (
     UTF8InputTextBuilder<CelledMockGrammar>,
-    DefaultInputTextPlugin<CelledMockGrammar>,
+    DefaultInputTextPlugin,
   ) {
     let builder =
-      UTF8InputTextBuilder::new(ORIGINAL_TEXT, Rc::new(RefCell::new(MockGrammar::new())));
+      UTF8InputTextBuilder::new(ORIGINAL_TEXT, Arc::new(Mutex::new(MockGrammar::new())));
     let mut config = Config::empty().unwrap();
     config.resource_dir = PathBuf::from_str(file!())
       .unwrap()
@@ -237,7 +228,7 @@ mod tests {
       .parent()
       .unwrap()
       .join("resources");
-    let plugin = DefaultInputTextPlugin::<CelledMockGrammar>::setup(&config).unwrap();
+    let plugin = DefaultInputTextPlugin::setup(&config).unwrap();
     (builder, plugin)
   }
 
@@ -296,7 +287,7 @@ mod tests {
   fn test_invalid_format_ignorelist() {
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_ignorelist.def");
     let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
-    let err = DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::from_reader(&mut reader)
+    let err = DefaultInputTextPlugin::from_reader(&mut reader)
       .err()
       .unwrap();
     assert_eq!("12 is not character at line 1", format!("{}", err));
@@ -306,7 +297,7 @@ mod tests {
   fn test_invalid_format_replacelist() {
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_replacelist.def");
     let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
-    let err = DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::from_reader(&mut reader)
+    let err = DefaultInputTextPlugin::from_reader(&mut reader)
       .err()
       .unwrap();
     assert_eq!("invalid format at line 1", format!("{}", err));
@@ -316,7 +307,7 @@ mod tests {
   fn test_duplicated_lines_replacelist() {
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_dup.def");
     let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
-    let err = DefaultInputTextPlugin::<Rc<RefCell<Grammar>>>::from_reader(&mut reader)
+    let err = DefaultInputTextPlugin::from_reader(&mut reader)
       .err()
       .unwrap();
     assert_eq!("12 is already defined at line 2", format!("{}", err));
