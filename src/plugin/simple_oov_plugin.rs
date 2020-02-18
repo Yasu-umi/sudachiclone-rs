@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use serde_json::Value;
 
-use super::oov_provider_plugin::{OovProviderPlugin, OovProviderPluginSetupErr};
+use super::oov_provider_plugin::OovProviderPlugin;
 use crate::dictionary_lib::grammar::GetPartOfSpeech;
 use crate::dictionary_lib::grammar::Grammar;
 use crate::dictionary_lib::word_info::WordInfo;
@@ -15,43 +15,37 @@ pub struct SimpleOovPlugin {
   left_id: u32,
   right_id: u32,
   cost: i32,
-  oov_pos_strings: Vec<String>,
   oov_pos_id: i16,
 }
 
 impl SimpleOovPlugin {
-  pub fn new(json_obj: &Value) -> SimpleOovPlugin {
+  pub fn setup(json_obj: &Value, grammar: Rc<RefCell<Grammar>>) -> Result<SimpleOovPlugin, ()> {
     let left_id = get_u64_by_key(json_obj, "leftId") as u32;
     let right_id = get_u64_by_key(json_obj, "rightId") as u32;
     let cost = get_i64_by_key(json_obj, "cost") as i32;
-    let oov_pos_strings = json_obj
+    let strings: Vec<&str> = json_obj
       .get("oovPOS")
       .map(|i| i.as_array())
       .flatten()
       .unwrap()
       .iter()
-      .map(|i| i.as_str().unwrap().to_string())
+      .map(|i| i.as_str().unwrap())
       .collect();
-    SimpleOovPlugin {
-      left_id,
-      right_id,
-      cost,
-      oov_pos_strings,
-      oov_pos_id: -1,
-    }
-  }
-}
-
-impl<T: InputText> OovProviderPlugin<T> for SimpleOovPlugin {
-  fn setup(&mut self, grammar: Rc<RefCell<Grammar>>) -> Result<(), OovProviderPluginSetupErr> {
-    let strings: Vec<&str> = self.oov_pos_strings.iter().map(|s| s.as_str()).collect();
-    self.oov_pos_id = grammar
+    let oov_pos_id = grammar
       .borrow()
       .get_part_of_speech_id(&strings)
       .map(|i| i as i16)
       .unwrap_or(-1);
-    Ok(())
+    Ok(SimpleOovPlugin {
+      left_id,
+      right_id,
+      cost,
+      oov_pos_id,
+    })
   }
+}
+
+impl<T: InputText> OovProviderPlugin<T> for SimpleOovPlugin {
   fn provide_oov(
     &self,
     input_text: &T,

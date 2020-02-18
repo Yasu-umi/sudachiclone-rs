@@ -237,7 +237,7 @@ mod tests {
       .unwrap()
       .join("resources/test");
     let config_path = resource_dir.join("sudachi.json");
-    Dictionary::new(
+    Dictionary::setup(
       Some(config_path.to_str().unwrap()),
       Some(resource_dir.to_str().unwrap()),
     )

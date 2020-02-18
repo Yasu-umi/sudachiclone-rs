@@ -11,7 +11,6 @@ use crate::dictionary_lib::grammar::Grammar;
 use crate::utf8_input_text_builder::{ReplaceErr, UTF8InputTextBuilder};
 
 pub trait InputTextPlugin<G = Rc<RefCell<Grammar>>> {
-  fn setup(&mut self) -> Result<(), InputTextPluginSetupErr>;
   fn rewrite(&self, builder: &mut UTF8InputTextBuilder<G>)
     -> Result<(), InputTextPluginReplaceErr>;
 }
@@ -22,10 +21,6 @@ pub enum InputTextPluginGetErr {
   InvalidClassErr(String),
   #[error("config file is invalid format")]
   InvalidFormatErr,
-}
-
-#[derive(Error, Debug)]
-pub enum InputTextPluginSetupErr {
   #[error("{self:?}")]
   DefaultInputTextPluginSetupErr(#[from] DefaultInputTextPluginSetupErr),
 }
@@ -42,9 +37,9 @@ fn get_input_text_plugin(
 ) -> Result<Box<dyn InputTextPlugin>, InputTextPluginGetErr> {
   if let Some(Value::String(class)) = json_obj.get("class") {
     if class == "sudachipy.plugin.input_text.DefaultInputTextPlugin" {
-      Ok(Box::new(DefaultInputTextPlugin::new(config)))
+      Ok(Box::new(DefaultInputTextPlugin::setup(config)?))
     } else if class == "sudachipy.plugin.input_text.ProlongedSoundMarkInputTextPlugin" {
-      Ok(Box::new(ProlongedSoundMarkInputTextPlugin::new(json_obj)))
+      Ok(Box::new(ProlongedSoundMarkInputTextPlugin::setup(json_obj)))
     } else {
       Err(InputTextPluginGetErr::InvalidClassErr(class.to_string()))
     }

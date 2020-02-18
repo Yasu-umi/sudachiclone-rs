@@ -11,14 +11,7 @@ use crate::dictionary_lib::grammar::Grammar;
 use crate::lattice_node::LatticeNode;
 use crate::utf8_input_text::{InputText, UTF8InputText};
 
-#[derive(Error, Debug)]
-pub enum OovProviderPluginSetupErr {
-  #[error("{self:?}")]
-  MecabOovPluginSetupErr(#[from] MecabOovPluginSetupErr),
-}
-
 pub trait OovProviderPlugin<T: InputText = UTF8InputText> {
-  fn setup(&mut self, grammar: Rc<RefCell<Grammar>>) -> Result<(), OovProviderPluginSetupErr>;
   fn provide_oov(
     &self,
     input_text: &T,
@@ -48,20 +41,22 @@ pub enum OovProviderPluginGetErr {
   InvalidClassErr(String),
   #[error("config file is invalid format")]
   InvalidFormatErr,
+  #[error("{self:?}")]
+  MecabOovPluginSetupErr(#[from] MecabOovPluginSetupErr),
 }
 
 fn get_oov_provider_plugin(
   config: &Config,
   json_obj: &Value,
+  grammar: Rc<RefCell<Grammar>>,
 ) -> Result<Box<dyn OovProviderPlugin>, OovProviderPluginGetErr> {
   if let Some(Value::String(class)) = json_obj.get("class") {
     if class == "sudachipy.plugin.oov.SimpleOovProviderPlugin" {
-      Ok(Box::new(SimpleOovPlugin::new(json_obj)))
+      let plugin = SimpleOovPlugin::setup(json_obj, grammar).unwrap();
+      Ok(Box::new(plugin))
     } else if class == "sudachipy.plugin.oov.MeCabOovProviderPlugin" {
-      Ok(Box::new(MecabOovPlugin::new(
-        &config.resource_dir,
-        json_obj,
-      )))
+      let plugin = MecabOovPlugin::setup(&config.resource_dir, json_obj, grammar)?;
+      Ok(Box::new(plugin))
     } else {
       Err(OovProviderPluginGetErr::InvalidClassErr(class.to_string()))
     }
@@ -72,11 +67,12 @@ fn get_oov_provider_plugin(
 
 pub fn get_oov_provider_plugins(
   config: &Config,
+  grammar: Rc<RefCell<Grammar>>,
 ) -> Result<Vec<Box<dyn OovProviderPlugin<UTF8InputText>>>, OovProviderPluginGetErr> {
   let mut plugins = vec![];
   if let Some(Value::Array(arr)) = config.settings.get("oovProviderPlugin") {
     for v in arr {
-      plugins.push(get_oov_provider_plugin(config, v)?);
+      plugins.push(get_oov_provider_plugin(config, v, Rc::clone(&grammar))?);
     }
   }
   Ok(plugins)

@@ -40,7 +40,7 @@ fn tokenize(args: &ArgMatches) {
   };
   // fpath_out or stdout
 
-  let dictionary = unwrap(Dictionary::new(args.value_of("fpath_setting"), None));
+  let dictionary = unwrap(Dictionary::setup(args.value_of("fpath_setting"), None));
   let tokenizer = dictionary.create();
 
   let mut input = String::new();

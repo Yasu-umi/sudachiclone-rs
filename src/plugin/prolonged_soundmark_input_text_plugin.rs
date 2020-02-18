@@ -2,9 +2,7 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
-use super::input_text_plugin::{
-  InputTextPlugin, InputTextPluginReplaceErr, InputTextPluginSetupErr,
-};
+use super::input_text_plugin::{InputTextPlugin, InputTextPluginReplaceErr};
 use crate::utf8_input_text_builder::UTF8InputTextBuilder;
 
 #[derive(Debug)]
@@ -14,9 +12,6 @@ pub struct ProlongedSoundMarkInputTextPlugin {
 }
 
 impl<G> InputTextPlugin<G> for ProlongedSoundMarkInputTextPlugin {
-  fn setup(&mut self) -> Result<(), InputTextPluginSetupErr> {
-    Ok(())
-  }
   fn rewrite(
     &self,
     builder: &mut UTF8InputTextBuilder<G>,
@@ -47,7 +42,7 @@ impl<G> InputTextPlugin<G> for ProlongedSoundMarkInputTextPlugin {
 }
 
 impl ProlongedSoundMarkInputTextPlugin {
-  pub fn new(json_obj: &Value) -> ProlongedSoundMarkInputTextPlugin {
+  pub fn setup(json_obj: &Value) -> ProlongedSoundMarkInputTextPlugin {
     let mut psm_set = HashSet::new();
     if let Some(Value::Array(marks)) = json_obj.get("prolongedSoundMarks") {
       for mark in marks {
@@ -56,10 +51,12 @@ impl ProlongedSoundMarkInputTextPlugin {
         }
       }
     }
-    let mut replace_symbol = String::from("ー");
-    if let Some(Value::String(_replacement_symbol)) = json_obj.get("replacementSymbol") {
-      replace_symbol = _replacement_symbol.to_string();
-    }
+    let replace_symbol =
+      if let Some(Value::String(replacement_symbol)) = json_obj.get("replacementSymbol") {
+        replacement_symbol.to_string()
+      } else {
+        String::from("ー")
+      };
     ProlongedSoundMarkInputTextPlugin {
       psm_set,
       replace_symbol,
@@ -113,7 +110,7 @@ mod tests {
   }
 
   fn build_plugin() -> ProlongedSoundMarkInputTextPlugin {
-    ProlongedSoundMarkInputTextPlugin::new(&json!({"prolongedSoundMarks":["ー", "〜", "〰"]}))
+    ProlongedSoundMarkInputTextPlugin::setup(&json!({"prolongedSoundMarks":["ー", "〜", "〰"]}))
   }
 
   #[test]
