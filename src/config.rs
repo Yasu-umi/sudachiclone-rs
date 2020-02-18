@@ -7,8 +7,21 @@ use std::str::FromStr;
 use std::string::FromUtf8Error;
 
 use serde_json::{error::Error as SerdeError, Value};
+#[cfg(any(target_os = "redox", unix, windows))]
 use symlink::{remove_symlink_dir, symlink_dir};
 use thiserror::Error;
+
+#[cfg(not(any(target_os = "redox", unix, windows)))]
+fn remove_symlink_dir<P: AsRef<Path>>(_path: P) -> Result<(), IOError> {
+  Err(IOError::new(
+    IOErrorKind::Other,
+    "can't call remove_symlink_dir",
+  ))
+}
+#[cfg(not(any(target_os = "redox", unix, windows)))]
+fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(_src: P, _dst: Q) -> Result<(), IOError> {
+  Err(IOError::new(IOErrorKind::Other, "can't call symlink_dir"))
+}
 
 use super::resources;
 
