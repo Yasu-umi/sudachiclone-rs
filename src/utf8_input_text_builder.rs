@@ -195,6 +195,7 @@ fn get_char_category_continuous_length(
   char_categories.len() - offset
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
   use super::*;

@@ -223,6 +223,7 @@ fn log_path(path: &[Rc<RefCell<LatticeNode>>]) {
   }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
   use super::*;
