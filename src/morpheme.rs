@@ -64,4 +64,26 @@ impl Morpheme {
   pub fn dictionary_id(&self) -> Option<usize> {
     self.node.lock().unwrap().get_dictionary_id()
   }
+  pub fn to_string(&self, print_all: bool) -> Vec<String> {
+    let mut list_info = vec![
+      self.surface(),
+      self.part_of_speech().join(","),
+      self.normalized_form().to_string(),
+    ];
+    if print_all {
+      list_info.push(self.dictionary_form().to_string());
+      list_info.push(self.reading_form().to_string());
+      list_info.push(
+        self
+          .dictionary_id()
+          .map(|i| i as i32)
+          .unwrap_or(-1)
+          .to_string(),
+      );
+      if self.is_oov() {
+        list_info.push(String::from("(OOV)"));
+      }
+    }
+    list_info
+  }
 }
