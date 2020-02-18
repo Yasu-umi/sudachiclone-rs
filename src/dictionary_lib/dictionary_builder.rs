@@ -962,7 +962,7 @@ mod tests {
     let (_dir, input_path) = setup_input();
 
     let mut stream = Cursor::new(vec![]);
-    let mut matrix_reader = Cursor::new("1 1\n0 0 200\n".as_bytes());
+    let mut matrix_reader = Cursor::new(b"1 1\n0 0 200\n");
     let header = DictionaryHeader::new(
       SYSTEM_DICT_VERSION,
       DictionaryHeader::get_time(),
