@@ -54,9 +54,9 @@ pub enum ReadCharacterDefinitionErr {
   InvalidRangeErr(usize),
   #[error("{1} is invalid type at line {0}")]
   FoundInvalidTypeErr(usize, String),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
 }
 

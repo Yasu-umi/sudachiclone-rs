@@ -27,13 +27,13 @@ use super::resources;
 
 #[derive(Error, Debug)]
 pub enum ConfigErr {
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   SerdeError(#[from] SerdeError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   Infallible(#[from] Infallible),
-  #[error("{self:?}")]
+  #[error("{0}")]
   FromUtf8Error(#[from] FromUtf8Error),
   #[error("`characterDefinitionFile` not defined in setting file")]
   CharDefiFileNotFoundError,
@@ -135,11 +135,11 @@ fn ok_or_io_err<T>(t: Option<T>, err: &str) -> Result<T, IOError> {
 
 #[derive(Error, Debug)]
 pub enum SudachiDictErr {
-  #[error("{self:?}")]
+  #[error("{0}")]
   Infallible(#[from] Infallible),
-  #[error("{self:?}")]
+  #[error("{0}")]
   FromUtf8Error(#[from] FromUtf8Error),
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
   #[error("`systemDict` must be specified if `SudachiDict_core` not installed")]
   NotFoundSudachiDictCoreErr,

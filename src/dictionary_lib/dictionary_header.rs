@@ -20,9 +20,9 @@ const STORAGE_SIZE: usize = 8 + 8 + DESCRIPTION_SIZE;
 pub enum DictionaryHeaderErr {
   #[error("description is too long")]
   DescriptionTooLongErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   FromUtf8Error(#[from] FromUtf8Error),
 }
 

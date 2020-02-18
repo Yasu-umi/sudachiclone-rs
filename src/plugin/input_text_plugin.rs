@@ -36,13 +36,13 @@ pub enum InputTextPluginGetErr {
   InvalidClassErr(String),
   #[error("config file is invalid format")]
   InvalidFormatErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   DefaultInputTextPluginSetupErr(#[from] DefaultInputTextPluginSetupErr),
 }
 
 #[derive(Error, Debug)]
 pub enum InputTextPluginReplaceErr {
-  #[error("{self:?}")]
+  #[error("{0}")]
   ReplaceErr(#[from] ReplaceErr),
 }
 

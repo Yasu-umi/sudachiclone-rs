@@ -22,19 +22,19 @@ use super::tokenizer::Tokenizer;
 pub enum DictionaryErr {
   #[error("too many dictionaries")]
   TooManyDictionariesErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ConfigErr(#[from] ConfigErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   SudachiDictErr(#[from] SudachiDictErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ReadDictionaryErr(#[from] ReadDictionaryErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   InputTextPluginGetErr(#[from] InputTextPluginGetErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   OovProviderPluginGetErr(#[from] OovProviderPluginGetErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ReadCharacterDefinitionErr(#[from] ReadCharacterDefinitionErr),
 }
 

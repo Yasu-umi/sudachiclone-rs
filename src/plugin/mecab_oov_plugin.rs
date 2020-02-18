@@ -57,9 +57,9 @@ pub enum MecabOovPluginSetupErr {
   CharDefNotDefinedErr,
   #[error("unkDef is not defined")]
   UnkDefNotDefinedErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
   #[error("invalid format at line {0} in char.def")]
   InvalidCharFormatErr(usize),

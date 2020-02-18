@@ -103,9 +103,9 @@ pub enum DefaultInputTextPluginSetupErr {
   AlreadyDefinedErr(usize, String),
   #[error("invalid format at line {0}")]
   InvalidFormatErr(usize),
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   Infallible(#[from] Infallible),
 }
 

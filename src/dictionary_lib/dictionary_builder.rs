@@ -67,15 +67,15 @@ pub enum DictionaryBuilderErr {
   InvalidFormatErr,
   #[error("invalid word id")]
   InvalidWordIdErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   CSVError(#[from] csv::Error),
-  #[error("{self:?}")]
+  #[error("{0}")]
   RegexError(#[from] RegexError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   LexiconErr(#[from] LexiconErr),
 }
 

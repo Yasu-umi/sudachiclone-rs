@@ -22,11 +22,11 @@ pub enum ReadDictionaryErr {
   InvalidUserDictionaryErr,
   #[error("not found grammar")]
   NotFoundGrammarErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   DictionaryHeaderErr(#[from] DictionaryHeaderErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   LexiconErr(#[from] LexiconErr),
 }
 

@@ -30,6 +30,6 @@ pub trait GetWordId {
 pub enum LexiconErr {
   #[error("not found word id")]
   NotFoundWordIdErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
 }

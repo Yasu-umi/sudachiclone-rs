@@ -63,9 +63,9 @@ pub enum OovProviderPluginGetErr {
   InvalidClassErr(String),
   #[error("config file is invalid format")]
   InvalidFormatErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   MecabOovPluginSetupErr(#[from] MecabOovPluginSetupErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   SimpleOovPluginSetupErr(#[from] SimpleOovPluginSetupErr),
 }
 
