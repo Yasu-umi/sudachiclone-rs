@@ -175,12 +175,10 @@ impl CharacterCategory {
     self.range_list.push(range);
   }
 
-  pub fn read_character_definition<P: AsRef<Path>>(
+  pub fn read_character_definition_from_reader<R: BufRead>(
     &mut self,
-    char_def: P,
+    reader: &mut R,
   ) -> Result<&Self, ReadCharacterDefinitionErr> {
-    let reader = BufReader::new(File::open(char_def)?);
-
     let only_spaces = Regex::new(r"^\s*$").unwrap();
 
     for (index, line) in reader.lines().enumerate() {
@@ -232,6 +230,14 @@ impl CharacterCategory {
     }
     self.compile();
     Ok(self)
+  }
+
+  pub fn read_character_definition<P: AsRef<Path>>(
+    &mut self,
+    char_def: P,
+  ) -> Result<&Self, ReadCharacterDefinitionErr> {
+    let mut reader = BufReader::new(File::open(char_def)?);
+    self.read_character_definition_from_reader(&mut reader)
   }
 }
 
