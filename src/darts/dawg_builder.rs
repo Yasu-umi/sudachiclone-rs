@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::num::Wrapping;
 
-use succinct::{BitRankSupport, BitVec, BitVecMut, BitVecPush, BitVector, JacobsonRank};
+// use succinct::{BitRankSupport, BitVec, BitVecMut, BitVecPush, BitVector, JacobsonRank};
 
 use super::dawg_node::DawgNode;
 use super::dawg_unit::DawgUnit;
@@ -12,8 +12,10 @@ pub struct DawgBuilder {
   nodes: Vec<DawgNode>,
   units: Vec<usize>,
   labels: Vec<u8>,
-  _is_intersections: BitVector,
-  is_intersections: JacobsonRank<BitVector>,
+  // _is_intersections: BitVector,
+  // is_intersections: JacobsonRank<BitVector>,
+  _is_intersections: Vec<bool>,
+  is_intersections: Vec<bool>,
   table: Vec<usize>,
   node_stack: Vec<usize>,
   recycle_bin: Vec<usize>,
@@ -38,8 +40,10 @@ impl DawgBuilder {
       nodes: vec![],
       units: vec![],
       labels: vec![],
-      _is_intersections: BitVector::new(),
-      is_intersections: JacobsonRank::new(BitVector::with_fill(10, false)),
+      // _is_intersections: BitVector::new(),
+      // is_intersections: JacobsonRank::new(BitVector::with_fill(10, false)),
+      _is_intersections: Vec::new(),
+      is_intersections: Vec::new(),
       table: vec![],
       node_stack: vec![],
       recycle_bin: vec![],
@@ -69,14 +73,17 @@ impl DawgBuilder {
     self.labels[id]
   }
   pub fn is_intersection(&self, id: usize) -> bool {
-    self.is_intersections.get_bit(id as u64)
+    // self.is_intersections.get_bit(id as u64)
+    *self.is_intersections.get(id).unwrap()
   }
   pub fn intersection_id(&self, id: usize) -> usize {
-    (self.is_intersections.rank1(id as u64) - 1) as usize
+    // (self.is_intersections.rank1(id as u64) - 1) as usize
+    self.is_intersections[0..id].iter().filter(|x| **x).count()
   }
   pub fn num_intersections(&self) -> usize {
     // too slow?
-    self.is_intersections.inner().iter().filter(|x| *x).count()
+    // self.is_intersections.inner().iter().filter(|x| *x).count()
+    self.is_intersections.iter().filter(|x| **x).count()
   }
   pub fn size(&self) -> usize {
     self.units.len()
@@ -100,7 +107,8 @@ impl DawgBuilder {
     self.node_stack.clear();
     self.recycle_bin.clear();
 
-    self.is_intersections = JacobsonRank::new(self._is_intersections.clone());
+    // self.is_intersections = JacobsonRank::new(self._is_intersections.clone());
+    self.is_intersections = self._is_intersections.clone();
     self._is_intersections.clear();
   }
   pub fn insert(&mut self, key: &[u8], length: usize, value: u32) {
@@ -147,10 +155,12 @@ impl DawgBuilder {
     self.nodes[id].child = value as usize;
   }
   fn append_unit(&mut self) -> usize {
-    self._is_intersections.push_bit(false);
+    // self._is_intersections.push_bit(false);
+    self._is_intersections.push(false);
     self.units.push(0);
     self.labels.push(0);
-    self._is_intersections.bit_len() as usize - 1
+    // self._is_intersections.bit_len() as usize - 1
+    self._is_intersections.len() - 1
   }
   fn append_node(&mut self) -> usize {
     if self.recycle_bin.is_empty() {
@@ -178,7 +188,8 @@ impl DawgBuilder {
 
       let (hash_id, mut match_id) = self.find_node(node_id);
       if match_id != 0 {
-        self._is_intersections.set_bit(match_id as u64, true);
+        // self._is_intersections.set_bit(match_id as u64, true);
+        self._is_intersections[match_id] = true;
       } else {
         let mut unit_id = 0;
         for _ in 0..num_siblings {
