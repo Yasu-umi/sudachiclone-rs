@@ -40,7 +40,7 @@ fn tokenize(args: &ArgMatches) {
   };
   // fpath_out or stdout
 
-  let dictionary = unwrap(Dictionary::new(args.value_of("fpath_setting"), None));
+  let dictionary = unwrap(Dictionary::setup(args.value_of("fpath_setting"), None));
   let tokenizer = dictionary.create();
 
   let mut input = String::new();
@@ -50,26 +50,7 @@ fn tokenize(args: &ArgMatches) {
       for line in input.trim().split('\n') {
         if let Some(morpheme_list) = tokenizer.tokenize(line, &mode, None) {
           for morpheme in morpheme_list {
-            let mut list_info = vec![
-              morpheme.surface(),
-              morpheme.part_of_speech().join(","),
-              morpheme.normalized_form().to_string(),
-            ];
-            if print_all {
-              list_info.push(morpheme.dictionary_form().to_string());
-              list_info.push(morpheme.reading_form().to_string());
-              list_info.push(
-                morpheme
-                  .dictionary_id()
-                  .map(|i| i as i32)
-                  .unwrap_or(-1)
-                  .to_string(),
-              );
-              if morpheme.is_oov() {
-                list_info.push(String::from("(OOV)"));
-              }
-            }
-            println!("{}", list_info.join("\t"));
+            println!("{}", morpheme.to_string(print_all).join("\t"));
           }
         }
       }

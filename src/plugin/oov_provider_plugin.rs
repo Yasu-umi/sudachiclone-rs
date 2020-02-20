@@ -1,41 +1,56 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 use thiserror::Error;
 
 use super::mecab_oov_plugin::{MecabOovPlugin, MecabOovPluginSetupErr};
-use super::simple_oov_plugin::SimpleOovPlugin;
+use super::simple_oov_plugin::{SimpleOovPlugin, SimpleOovPluginSetupErr};
 use crate::config::Config;
 use crate::dictionary_lib::grammar::Grammar;
 use crate::lattice_node::LatticeNode;
 use crate::utf8_input_text::{InputText, UTF8InputText};
 
-#[derive(Error, Debug)]
-pub enum OovProviderPluginSetupErr {
-  #[error("{self:?}")]
-  MecabOovPluginSetupErr(#[from] MecabOovPluginSetupErr),
+pub enum OovProviderPlugin {
+  MecabOovPlugin(MecabOovPlugin),
+  SimpleOovPlugin(SimpleOovPlugin),
 }
 
-pub trait OovProviderPlugin<T: InputText = UTF8InputText> {
-  fn setup(&mut self, grammar: Rc<RefCell<Grammar>>) -> Result<(), OovProviderPluginSetupErr>;
+pub trait ProvideOov<T: InputText = UTF8InputText> {
   fn provide_oov(
     &self,
     input_text: &T,
     offset: usize,
     has_other_words: bool,
-  ) -> Vec<Rc<RefCell<LatticeNode>>>;
+  ) -> Vec<Arc<Mutex<LatticeNode>>>;
+}
+
+impl<T: InputText> ProvideOov<T> for OovProviderPlugin {
+  fn provide_oov(
+    &self,
+    input_text: &T,
+    offset: usize,
+    has_other_words: bool,
+  ) -> Vec<Arc<Mutex<LatticeNode>>> {
+    match self {
+      OovProviderPlugin::MecabOovPlugin(plugin) => {
+        plugin.provide_oov(input_text, offset, has_other_words)
+      }
+      OovProviderPlugin::SimpleOovPlugin(plugin) => {
+        plugin.provide_oov(input_text, offset, has_other_words)
+      }
+    }
+  }
 }
 
 pub fn get_oov<T: InputText>(
-  plugin: &dyn OovProviderPlugin<T>,
+  plugin: &OovProviderPlugin,
   input_text: &T,
   offset: usize,
   has_other_words: bool,
-) -> Vec<Rc<RefCell<LatticeNode>>> {
+) -> Vec<Arc<Mutex<LatticeNode>>> {
   let nodes = plugin.provide_oov(input_text, offset, has_other_words);
   for node in nodes.iter() {
-    let mut node = node.borrow_mut();
+    let mut node = node.lock().unwrap();
     node.start = offset;
     node.end = offset + node.get_word_info().head_word_length;
   }
@@ -48,20 +63,28 @@ pub enum OovProviderPluginGetErr {
   InvalidClassErr(String),
   #[error("config file is invalid format")]
   InvalidFormatErr,
+  #[error("{0}")]
+  MecabOovPluginSetupErr(#[from] MecabOovPluginSetupErr),
+  #[error("{0}")]
+  SimpleOovPluginSetupErr(#[from] SimpleOovPluginSetupErr),
 }
 
 fn get_oov_provider_plugin(
   config: &Config,
   json_obj: &Value,
-) -> Result<Box<dyn OovProviderPlugin>, OovProviderPluginGetErr> {
+  grammar: Arc<Mutex<Grammar>>,
+) -> Result<OovProviderPlugin, OovProviderPluginGetErr> {
   if let Some(Value::String(class)) = json_obj.get("class") {
     if class == "sudachipy.plugin.oov.SimpleOovProviderPlugin" {
-      Ok(Box::new(SimpleOovPlugin::new(json_obj)))
+      Ok(OovProviderPlugin::SimpleOovPlugin(SimpleOovPlugin::setup(
+        json_obj, grammar,
+      )?))
     } else if class == "sudachipy.plugin.oov.MeCabOovProviderPlugin" {
-      Ok(Box::new(MecabOovPlugin::new(
+      Ok(OovProviderPlugin::MecabOovPlugin(MecabOovPlugin::setup(
         &config.resource_dir,
         json_obj,
-      )))
+        grammar,
+      )?))
     } else {
       Err(OovProviderPluginGetErr::InvalidClassErr(class.to_string()))
     }
@@ -72,11 +95,12 @@ fn get_oov_provider_plugin(
 
 pub fn get_oov_provider_plugins(
   config: &Config,
-) -> Result<Vec<Box<dyn OovProviderPlugin<UTF8InputText>>>, OovProviderPluginGetErr> {
+  grammar: Arc<Mutex<Grammar>>,
+) -> Result<Vec<OovProviderPlugin>, OovProviderPluginGetErr> {
   let mut plugins = vec![];
   if let Some(Value::Array(arr)) = config.settings.get("oovProviderPlugin") {
     for v in arr {
-      plugins.push(get_oov_provider_plugin(config, v)?);
+      plugins.push(get_oov_provider_plugin(config, v, Arc::clone(&grammar))?);
     }
   }
   Ok(plugins)

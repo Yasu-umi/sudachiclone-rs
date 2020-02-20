@@ -1,16 +1,15 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IOError};
 use std::num::ParseIntError;
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 use thiserror::Error;
 
-use super::oov_provider_plugin::{OovProviderPlugin, OovProviderPluginSetupErr};
+use super::oov_provider_plugin::ProvideOov;
 use crate::dictionary_lib::category_type::CategoryType;
 use crate::dictionary_lib::grammar::{GetPartOfSpeech, Grammar};
 use crate::dictionary_lib::word_info::WordInfo;
@@ -43,12 +42,13 @@ impl Oov {
   }
 }
 
+type Categories = HashMap<CategoryType, CategoryInfo>;
+type OovsList = HashMap<CategoryType, Vec<Oov>>;
+
 #[derive(Debug)]
 pub struct MecabOovPlugin {
-  chardef_path: Option<PathBuf>,
-  unkdef_path: Option<PathBuf>,
-  categories: HashMap<CategoryType, CategoryInfo>,
-  oovs_list: HashMap<CategoryType, Vec<Oov>>,
+  categories: Categories,
+  oovs_list: OovsList,
 }
 
 #[derive(Debug, Error)]
@@ -57,9 +57,9 @@ pub enum MecabOovPluginSetupErr {
   CharDefNotDefinedErr,
   #[error("unkDef is not defined")]
   UnkDefNotDefinedErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
   #[error("invalid format at line {0} in char.def")]
   InvalidCharFormatErr(usize),
@@ -74,7 +74,12 @@ pub enum MecabOovPluginSetupErr {
 }
 
 impl MecabOovPlugin {
-  pub fn new(resource_dir: &PathBuf, json_obj: &Value) -> MecabOovPlugin {
+  pub fn setup<P: AsRef<Path>>(
+    resource_dir: P,
+    json_obj: &Value,
+    grammar: Arc<Mutex<Grammar>>,
+  ) -> Result<MecabOovPlugin, MecabOovPluginSetupErr> {
+    let resource_dir = resource_dir.as_ref();
     let chardef_path = json_obj
       .get("charDef")
       .map(|i| i.as_str())
@@ -85,100 +90,124 @@ impl MecabOovPlugin {
       .map(|i| i.as_str())
       .flatten()
       .map(|i| resource_dir.join(i));
-    MecabOovPlugin {
-      chardef_path,
-      unkdef_path,
-      categories: HashMap::new(),
-      oovs_list: HashMap::new(),
-    }
+    let categories = MecabOovPlugin::read_character_property(chardef_path)?;
+    let oovs_list = MecabOovPlugin::read_oov(unkdef_path, &categories, grammar)?;
+    Ok(MecabOovPlugin {
+      categories,
+      oovs_list,
+    })
   }
-  fn read_character_property(&mut self) -> Result<(), MecabOovPluginSetupErr> {
-    if let Some(chardef_path) = self.chardef_path.as_ref() {
-      for (i, line) in BufReader::new(File::open(chardef_path)?)
-        .lines()
-        .enumerate()
-      {
-        let i = i + 1;
-        let line = line?;
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') || line.starts_with("0x") {
-          continue;
-        }
-        let cols: Vec<&str> = line.split_whitespace().collect();
-        if cols.len() < 4 {
-          return Err(MecabOovPluginSetupErr::InvalidCharFormatErr(i));
-        }
-        if let Ok(_type) = CategoryType::from_str(cols[0]) {
-          if self.categories.contains_key(&_type) {
-            return Err(MecabOovPluginSetupErr::AlreadyDefinedErr(
-              i,
-              cols[0].to_string(),
-            ));
-          }
-          let info = CategoryInfo {
-            is_invoke: cols[1] != "0",
-            is_group: cols[2] != "0",
-            length: usize::from_str(cols[3])?,
-          };
-          self.categories.insert(_type, info);
-        } else {
-          return Err(MecabOovPluginSetupErr::InvalidTypeErr(
+
+  fn read_character_property_from_reader<R: BufRead>(
+    reader: &mut R,
+  ) -> Result<Categories, MecabOovPluginSetupErr> {
+    let mut categories = HashMap::new();
+    for (i, line) in reader.lines().enumerate() {
+      let i = i + 1;
+      let line = line?;
+      let line = line.trim();
+      if line.is_empty() || line.starts_with('#') || line.starts_with("0x") {
+        continue;
+      }
+      let cols: Vec<&str> = line.split_whitespace().collect();
+      if cols.len() < 4 {
+        return Err(MecabOovPluginSetupErr::InvalidCharFormatErr(i));
+      }
+      if let Ok(_type) = CategoryType::from_str(cols[0]) {
+        if categories.contains_key(&_type) {
+          return Err(MecabOovPluginSetupErr::AlreadyDefinedErr(
             i,
             cols[0].to_string(),
           ));
         }
+        let info = CategoryInfo {
+          is_invoke: cols[1] != "0",
+          is_group: cols[2] != "0",
+          length: usize::from_str(cols[3])?,
+        };
+        categories.insert(_type, info);
+      } else {
+        return Err(MecabOovPluginSetupErr::InvalidTypeErr(
+          i,
+          cols[0].to_string(),
+        ));
       }
-      Ok(())
+    }
+    Ok(categories)
+  }
+
+  fn read_character_property(
+    chardef_path: Option<PathBuf>,
+  ) -> Result<Categories, MecabOovPluginSetupErr> {
+    if let Some(chardef_path) = chardef_path {
+      let mut reader = BufReader::new(File::open(chardef_path)?);
+      MecabOovPlugin::read_character_property_from_reader(&mut reader)
     } else {
       Err(MecabOovPluginSetupErr::CharDefNotDefinedErr)
     }
   }
-  fn read_oov(&mut self, grammar: Rc<RefCell<Grammar>>) -> Result<(), MecabOovPluginSetupErr> {
-    if let Some(unkdef_path) = self.unkdef_path.as_ref() {
-      let grammar = RefCell::borrow(&grammar);
-      for (i, line) in BufReader::new(File::open(unkdef_path)?).lines().enumerate() {
-        let i = i + 1;
-        let line = line?;
-        let line = line.trim();
-        if !line.is_empty() {
-          continue;
-        }
-        let cols: Vec<&str> = line.split(',').collect();
-        if cols.len() < 10 {
-          return Err(MecabOovPluginSetupErr::InvalidUnkFormatErr(i));
-        }
 
-        if let Ok(_type) = CategoryType::from_str(cols[0]) {
-          if !self.categories.contains_key(&_type) {
-            return Err(MecabOovPluginSetupErr::NotDefinedErr(
-              i,
-              cols[0].to_string(),
-            ));
-          }
-          let oov = Oov::new(
-            u32::from_str(cols[1])?,
-            u32::from_str(cols[2])?,
-            i32::from_str(cols[3])?,
-            grammar.get_part_of_speech_id(&cols[4..10]),
-          );
-          if let Some(oovs) = self.oovs_list.get_mut(&_type) {
-            oovs.push(oov);
-          } else {
-            self.oovs_list.insert(_type, vec![oov]);
-          }
-        } else {
-          return Err(MecabOovPluginSetupErr::InvalidTypeErr(
+  fn read_oov_from_reader<R: BufRead>(
+    reader: &mut R,
+    categories: &Categories,
+    grammar: Arc<Mutex<Grammar>>,
+  ) -> Result<OovsList, MecabOovPluginSetupErr> {
+    let mut oovs_list: OovsList = HashMap::new();
+    let grammar = grammar.lock().unwrap();
+    for (i, line) in reader.lines().enumerate() {
+      let i = i + 1;
+      let line = line?;
+      let line = line.trim();
+      if !line.is_empty() {
+        continue;
+      }
+      let cols: Vec<&str> = line.split(',').collect();
+      if cols.len() < 10 {
+        return Err(MecabOovPluginSetupErr::InvalidUnkFormatErr(i));
+      }
+
+      if let Ok(_type) = CategoryType::from_str(cols[0]) {
+        if !categories.contains_key(&_type) {
+          return Err(MecabOovPluginSetupErr::NotDefinedErr(
             i,
             cols[0].to_string(),
           ));
         }
+        let oov = Oov::new(
+          u32::from_str(cols[1])?,
+          u32::from_str(cols[2])?,
+          i32::from_str(cols[3])?,
+          grammar.get_part_of_speech_id(&cols[4..10]),
+        );
+        if let Some(oovs) = oovs_list.get_mut(&_type) {
+          oovs.push(oov);
+        } else {
+          oovs_list.insert(_type, vec![oov]);
+        }
+      } else {
+        return Err(MecabOovPluginSetupErr::InvalidTypeErr(
+          i,
+          cols[0].to_string(),
+        ));
       }
-      Ok(())
+    }
+    Ok(oovs_list)
+  }
+
+  fn read_oov(
+    unkdef_path: Option<PathBuf>,
+    categories: &Categories,
+    grammar: Arc<Mutex<Grammar>>,
+  ) -> Result<OovsList, MecabOovPluginSetupErr> {
+    if let Some(unkdef_path) = unkdef_path {
+      let mut reader = BufReader::new(File::open(unkdef_path)?);
+      MecabOovPlugin::read_oov_from_reader(&mut reader, categories, grammar)
     } else {
       Err(MecabOovPluginSetupErr::UnkDefNotDefinedErr)
     }
   }
-  fn get_oov_node(&self, text: &str, oov: &Oov, len: usize) -> Rc<RefCell<LatticeNode>> {
+
+  fn get_oov_node(&self, text: &str, oov: &Oov, len: usize) -> Arc<Mutex<LatticeNode>> {
     let mut node = LatticeNode::empty(oov.left_id, oov.right_id, oov.cost);
     node.set_oov();
     let info = WordInfo {
@@ -194,22 +223,17 @@ impl MecabOovPlugin {
       word_structure: vec![],
     };
     node.set_word_info(info);
-    Rc::new(RefCell::new(node))
+    Arc::new(Mutex::new(node))
   }
 }
 
-impl<T: InputText> OovProviderPlugin<T> for MecabOovPlugin {
-  fn setup(&mut self, grammar: Rc<RefCell<Grammar>>) -> Result<(), OovProviderPluginSetupErr> {
-    self.read_character_property()?;
-    self.read_oov(grammar)?;
-    Ok(())
-  }
+impl<T: InputText> ProvideOov<T> for &MecabOovPlugin {
   fn provide_oov(
     &self,
     input_text: &T,
     offset: usize,
     has_other_words: bool,
-  ) -> Vec<Rc<RefCell<LatticeNode>>> {
+  ) -> Vec<Arc<Mutex<LatticeNode>>> {
     let len = input_text.get_char_category_continuous_length(offset);
     let mut nodes = vec![];
     if len < 1 {
@@ -310,8 +334,6 @@ mod tests {
 
   fn build_plugin() -> MecabOovPlugin {
     let mut plugin = MecabOovPlugin {
-      chardef_path: None,
-      unkdef_path: None,
       categories: HashMap::new(),
       oovs_list: HashMap::new(),
     };
@@ -345,9 +367,9 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(0, nodes.len());
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -362,9 +384,9 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(0, nodes.len());
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -379,15 +401,15 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(1, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -402,15 +424,15 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(1, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(1, nodes.len());
   }
 
@@ -425,20 +447,20 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(2, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あ", node.get_word_info().surface);
     assert_eq!(1, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[1]);
+    let node = nodes[1].lock().unwrap();
     assert_eq!("あい", node.get_word_info().surface);
     assert_eq!(2, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -453,25 +475,25 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(3, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[1]);
+    let node = nodes[1].lock().unwrap();
     assert_eq!("あ", node.get_word_info().surface);
     assert_eq!(1, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[2]);
+    let node = nodes[2].lock().unwrap();
     assert_eq!("あい", node.get_word_info().surface);
     assert_eq!(2, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(0, nodes.len());
   }
 
@@ -486,25 +508,25 @@ mod tests {
     plugin.categories.insert(CategoryType::KANJI, category_info);
     let mocked_input_text = build_mocked_input_text();
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, false);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
     assert_eq!(3, nodes.len());
 
-    let node = RefCell::borrow(&nodes[0]);
+    let node = nodes[0].lock().unwrap();
     assert_eq!("あいう", node.get_word_info().surface);
     assert_eq!(3, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[1]);
+    let node = nodes[1].lock().unwrap();
     assert_eq!("あ", node.get_word_info().surface);
     assert_eq!(1, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let node = RefCell::borrow(&nodes[2]);
+    let node = nodes[2].lock().unwrap();
     assert_eq!("あい", node.get_word_info().surface);
     assert_eq!(2, node.get_word_info().head_word_length);
     assert_eq!(1, node.get_word_info().pos_id);
 
-    let nodes = plugin.provide_oov(&mocked_input_text, 0, true);
+    let nodes = (&plugin).provide_oov(&mocked_input_text, 0, true);
     assert_eq!(3, nodes.len());
   }
 }

@@ -54,9 +54,9 @@ pub enum ReadCharacterDefinitionErr {
   InvalidRangeErr(usize),
   #[error("{1} is invalid type at line {0}")]
   FoundInvalidTypeErr(usize, String),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
 }
 
@@ -73,7 +73,6 @@ fn parse_hex(t: &str) -> Result<u32, ParseIntError> {
   u32::from_str_radix(t.trim_start_matches("0x"), 16)
 }
 
-#[derive(Default)]
 pub struct CharacterCategory {
   range_list: Vec<CharacterCategoryRange>,
 }
@@ -175,12 +174,10 @@ impl CharacterCategory {
     self.range_list.push(range);
   }
 
-  pub fn read_character_definition<P: AsRef<Path>>(
-    &mut self,
-    char_def: P,
-  ) -> Result<&Self, ReadCharacterDefinitionErr> {
-    let reader = BufReader::new(File::open(char_def)?);
-
+  pub fn read_character_definition_from_reader<R: BufRead>(
+    reader: &mut R,
+  ) -> Result<CharacterCategory, ReadCharacterDefinitionErr> {
+    let mut range_list = Vec::new();
     let only_spaces = Regex::new(r"^\s*$").unwrap();
 
     for (index, line) in reader.lines().enumerate() {
@@ -228,13 +225,22 @@ impl CharacterCategory {
           }
         }
       }
-      self.range_list.push(range);
+      range_list.push(range);
     }
-    self.compile();
-    Ok(self)
+    let mut char_category = CharacterCategory { range_list };
+    char_category.compile();
+    Ok(char_category)
+  }
+
+  pub fn read_character_definition<P: AsRef<Path>>(
+    char_def: P,
+  ) -> Result<CharacterCategory, ReadCharacterDefinitionErr> {
+    let mut reader = BufReader::new(File::open(char_def)?);
+    CharacterCategory::read_character_definition_from_reader(&mut reader)
   }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -245,10 +251,9 @@ mod tests {
 
   #[test]
   fn test_get_category_types() {
-    let mut category = CharacterCategory::default();
-    category
-      .read_character_definition(resources_test_dir().join("char.def").as_path())
-      .unwrap();
+    let category =
+      CharacterCategory::read_character_definition(resources_test_dir().join("char.def").as_path())
+        .unwrap();
     let code_point = "熙".chars().next().unwrap() as u32;
     assert_eq!(
       CategoryType::KANJI,
@@ -295,8 +300,7 @@ mod tests {
         "0x0032         KANJI\n",
       ],
     );
-    let mut category = CharacterCategory::default();
-    category.read_character_definition(&filename).unwrap();
+    let category = CharacterCategory::read_character_definition(&filename).unwrap();
     assert!(category
       .get_category_types(0x0030)
       .contains(&CategoryType::NUMERIC));
@@ -328,8 +332,7 @@ mod tests {
         "0x0030         KANJI\n",
       ],
     );
-    let mut category = CharacterCategory::default();
-    category.read_character_definition(&filename).unwrap();
+    let category = CharacterCategory::read_character_definition(&filename).unwrap();
     assert!(category
       .get_category_types(0x0030)
       .contains(&CategoryType::NUMERIC));
@@ -367,8 +370,7 @@ mod tests {
         "0x0030         KANJI\n",
       ],
     );
-    let mut category = CharacterCategory::default();
-    category.read_character_definition(&filename).unwrap();
+    let category = CharacterCategory::read_character_definition(&filename).unwrap();
     assert!(category
       .get_category_types(0x0029)
       .contains(&CategoryType::DEFAULT));
@@ -391,8 +393,7 @@ mod tests {
       resources_test_dir().join("test_read_character_definition_with_invalid_format.txt");
 
     writelines(&filename, vec!["0x0030..0x0039\n"]);
-    let mut category = CharacterCategory::default();
-    match category.read_character_definition(&filename) {
+    match CharacterCategory::read_character_definition(&filename) {
       Ok(_) => panic!("should throw invalid format error"),
       Err(err) => assert_eq!("invalid format at line 0", format!("{}", err)),
     }
@@ -406,8 +407,7 @@ mod tests {
       resources_test_dir().join("test_read_character_definition_with_invalid_range.txt");
 
     writelines(&filename, vec!["0x0030..0x0029 NUMERIC\n"]);
-    let mut category = CharacterCategory::default();
-    match category.read_character_definition(&filename) {
+    match CharacterCategory::read_character_definition(&filename) {
       Ok(_) => panic!("should throw invalid range error"),
       Err(err) => assert_eq!("invalid range at line 0", format!("{}", err)),
     }
@@ -421,8 +421,7 @@ mod tests {
       resources_test_dir().join("test_read_character_definition_with_invalid_type.txt");
 
     writelines(&filename, vec!["0x0030..0x0039 FOO\n"]);
-    let mut category = CharacterCategory::default();
-    match category.read_character_definition(&filename) {
+    match CharacterCategory::read_character_definition(&filename) {
       Ok(_) => panic!("should throw invalid type error"),
       Err(err) => assert_eq!("FOO is invalid type at line 0", format!("{}", err)),
     }

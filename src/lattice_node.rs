@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use rand::Rng;
 
@@ -15,10 +14,10 @@ pub struct LatticeNode {
   pub word_id: usize,
   _is_oov: bool,
   pub is_defined: bool,
-  pub best_previous_node: Option<Rc<RefCell<LatticeNode>>>,
+  pub best_previous_node: Option<Arc<Mutex<LatticeNode>>>,
   pub is_connected_to_bos: bool,
   extra_word_info: Option<WordInfo>,
-  lexicon: Option<Rc<RefCell<LexiconSet>>>,
+  lexicon: Option<Arc<Mutex<LexiconSet>>>,
   pub left_id: u32,
   pub right_id: u32,
   pub cost: i32,
@@ -52,7 +51,7 @@ impl LatticeNode {
     }
   }
   pub fn new(
-    lexicon: Option<Rc<RefCell<LexiconSet>>>,
+    lexicon: Option<Arc<Mutex<LexiconSet>>>,
     left_id: u32,
     right_id: u32,
     cost: i32,
@@ -110,7 +109,8 @@ impl LatticeNode {
           .lexicon
           .as_ref()
           .unwrap()
-          .borrow()
+          .lock()
+          .unwrap()
           .get_dictionary_id(self.word_id),
       ) // self.word_id >> 28
     }
@@ -125,7 +125,8 @@ impl LatticeNode {
         .lexicon
         .as_ref()
         .unwrap()
-        .borrow()
+        .lock()
+        .unwrap()
         .get_word_info(self.word_id),
     }
   }

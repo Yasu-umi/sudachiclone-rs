@@ -67,15 +67,15 @@ pub enum DictionaryBuilderErr {
   InvalidFormatErr,
   #[error("invalid word id")]
   InvalidWordIdErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   CSVError(#[from] csv::Error),
-  #[error("{self:?}")]
+  #[error("{0}")]
   RegexError(#[from] RegexError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   LexiconErr(#[from] LexiconErr),
 }
 
@@ -639,18 +639,27 @@ pub fn build_empty_entry() -> WordEntry {
 #[cfg(test)]
 mod tests {
   use super::*;
+  #[cfg(not(target_arch = "wasm32"))]
   use crate::dictionary_lib::dictionary_header::DictionaryHeader;
+  #[cfg(not(target_arch = "wasm32"))]
   use crate::dictionary_lib::double_array_lexicon::DoubleArrayLexicon;
+  #[cfg(not(target_arch = "wasm32"))]
   use crate::dictionary_lib::grammar::Grammar;
+  #[cfg(not(target_arch = "wasm32"))]
   use crate::dictionary_lib::lexicon::{Lexicon, Size};
+  #[cfg(not(target_arch = "wasm32"))]
   use crate::dictionary_lib::lexicon_set::LexiconSet;
+  #[cfg(not(target_arch = "wasm32"))]
   use crate::dictionary_lib::system_dictionary_version::SYSTEM_DICT_VERSION;
 
   use encoding_rs::UTF_16LE;
 
+  #[cfg(not(target_arch = "wasm32"))]
   use std::env::temp_dir;
+  #[cfg(not(target_arch = "wasm32"))]
   use std::fs::{create_dir, remove_dir_all, File};
   use std::io::Read;
+  #[cfg(not(target_arch = "wasm32"))]
   use std::path::{Path, PathBuf};
 
   #[test]
@@ -927,6 +936,7 @@ mod tests {
     );
   }
 
+  #[cfg(not(target_arch = "wasm32"))]
   fn setup_input() -> (PathBuf, PathBuf) {
     let dir = temp_dir().join("test");
     if Path::exists(&dir) {
@@ -945,6 +955,7 @@ mod tests {
     (dir, input_path)
   }
 
+  #[cfg(not(target_arch = "wasm32"))]
   fn read_system_dictionary<R: BufRead + Seek>(
     reader: &mut R,
   ) -> (DictionaryHeader, Grammar, LexiconSet) {
@@ -957,12 +968,13 @@ mod tests {
     (header, grammar, lexicon_set)
   }
 
+  #[cfg(not(target_arch = "wasm32"))]
   #[test]
   fn test_build() {
     let (_dir, input_path) = setup_input();
 
     let mut stream = Cursor::new(vec![]);
-    let mut matrix_reader = Cursor::new("1 1\n0 0 200\n".as_bytes());
+    let mut matrix_reader = Cursor::new(b"1 1\n0 0 200\n");
     let header = DictionaryHeader::new(
       SYSTEM_DICT_VERSION,
       DictionaryHeader::get_time(),

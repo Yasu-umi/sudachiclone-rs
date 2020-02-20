@@ -2,9 +2,7 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
-use super::input_text_plugin::{
-  InputTextPlugin, InputTextPluginReplaceErr, InputTextPluginSetupErr,
-};
+use super::input_text_plugin::{InputTextPluginReplaceErr, RewriteInputText};
 use crate::utf8_input_text_builder::UTF8InputTextBuilder;
 
 #[derive(Debug)]
@@ -13,11 +11,8 @@ pub struct ProlongedSoundMarkInputTextPlugin {
   replace_symbol: String,
 }
 
-impl<G> InputTextPlugin<G> for ProlongedSoundMarkInputTextPlugin {
-  fn setup(&mut self) -> Result<(), InputTextPluginSetupErr> {
-    Ok(())
-  }
-  fn rewrite(
+impl RewriteInputText for &ProlongedSoundMarkInputTextPlugin {
+  fn rewrite<G>(
     &self,
     builder: &mut UTF8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr> {
@@ -47,7 +42,7 @@ impl<G> InputTextPlugin<G> for ProlongedSoundMarkInputTextPlugin {
 }
 
 impl ProlongedSoundMarkInputTextPlugin {
-  pub fn new(json_obj: &Value) -> ProlongedSoundMarkInputTextPlugin {
+  pub fn setup(json_obj: &Value) -> ProlongedSoundMarkInputTextPlugin {
     let mut psm_set = HashSet::new();
     if let Some(Value::Array(marks)) = json_obj.get("prolongedSoundMarks") {
       for mark in marks {
@@ -56,10 +51,12 @@ impl ProlongedSoundMarkInputTextPlugin {
         }
       }
     }
-    let mut replace_symbol = String::from("ー");
-    if let Some(Value::String(_replacement_symbol)) = json_obj.get("replacementSymbol") {
-      replace_symbol = _replacement_symbol.to_string();
-    }
+    let replace_symbol =
+      if let Some(Value::String(replacement_symbol)) = json_obj.get("replacementSymbol") {
+        replacement_symbol.to_string()
+      } else {
+        String::from("ー")
+      };
     ProlongedSoundMarkInputTextPlugin {
       psm_set,
       replace_symbol,
@@ -67,35 +64,33 @@ impl ProlongedSoundMarkInputTextPlugin {
   }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::dictionary_lib::character_category::CharacterCategory;
   use crate::dictionary_lib::grammar::{GetCharacterCategory, SetCharacterCategory};
   use serde_json::json;
-  use std::cell::RefCell;
   use std::path::PathBuf;
-  use std::rc::Rc;
   use std::str::FromStr;
+  use std::sync::{Arc, Mutex};
 
   struct MockGrammar {
     character_category: Option<CharacterCategory>,
   }
   impl MockGrammar {
     fn new() -> MockGrammar {
-      let mut character_category = CharacterCategory::default();
-      character_category
-        .read_character_definition(
-          PathBuf::from_str(file!())
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("resources/char.def")
-            .as_path(),
-        )
-        .unwrap();
+      let character_category = CharacterCategory::read_character_definition(
+        PathBuf::from_str(file!())
+          .unwrap()
+          .parent()
+          .unwrap()
+          .parent()
+          .unwrap()
+          .join("resources/char.def")
+          .as_path(),
+      )
+      .unwrap();
       MockGrammar {
         character_category: Some(character_category),
       }
@@ -113,16 +108,15 @@ mod tests {
   }
 
   fn build_plugin() -> ProlongedSoundMarkInputTextPlugin {
-    ProlongedSoundMarkInputTextPlugin::new(&json!({"prolongedSoundMarks":["ー", "〜", "〰"]}))
+    ProlongedSoundMarkInputTextPlugin::setup(&json!({"prolongedSoundMarks":["ー", "〜", "〰"]}))
   }
 
   #[test]
   fn test_combine_continuous_prolonged_sound_mark() {
     let original = "ゴーール";
     let normalized = "ゴール";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -145,9 +139,8 @@ mod tests {
   fn test_combined_continuous_prolonged_sound_marks_at_end() {
     let original = "スーパーー";
     let normalized = "スーパー";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -171,9 +164,8 @@ mod tests {
   fn test_combine_continuous_prolonged_sound_marks_multi_times() {
     let original = "エーービーーーシーーーー";
     let normalized = "エービーシー";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -202,9 +194,8 @@ mod tests {
   fn test_combine_continuous_prolonged_sound_marks_multi_symbol_types() {
     let original = "エーービ〜〜〜シ〰〰〰〰";
     let normalized = "エービーシー";
-    let plugin = build_plugin();
-    let mut builder =
-      UTF8InputTextBuilder::new(original, Rc::new(RefCell::new(MockGrammar::new())));
+    let plugin = &build_plugin();
+    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 

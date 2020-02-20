@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufReader, Error as IOError};
+use std::io::{BufRead, BufReader, Error as IOError, Seek};
 use std::path::Path;
 
 use thiserror::Error;
@@ -22,11 +22,11 @@ pub enum ReadDictionaryErr {
   InvalidUserDictionaryErr,
   #[error("not found grammar")]
   NotFoundGrammarErr,
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
-  #[error("{self:?}")]
+  #[error("{0}")]
   DictionaryHeaderErr(#[from] DictionaryHeaderErr),
-  #[error("{self:?}")]
+  #[error("{0}")]
   LexiconErr(#[from] LexiconErr),
 }
 
@@ -48,34 +48,30 @@ impl BinaryDictionary {
       lexicon,
     }
   }
-  pub fn read_dictionary<P: AsRef<Path>>(
-    filename: P,
+  pub fn read_dictionary_from_reader<R: Seek + BufRead>(
+    reader: &mut R,
   ) -> Result<BinaryDictionary, ReadDictionaryErr> {
-    let mut reader = BufReader::new(File::open(filename)?);
+    let header = DictionaryHeader::from_reader(reader)?;
 
-    let header = DictionaryHeader::from_reader(&mut reader)?;
-
-    if ![
-      SYSTEM_DICT_VERSION,
-      USER_DICT_VERSION_1,
-      USER_DICT_VERSION_2,
-    ]
-    .contains(&header.version)
+    if SYSTEM_DICT_VERSION != header.version
+      && USER_DICT_VERSION_1 != header.version
+      && USER_DICT_VERSION_2 != header.version
     {
       return Err(ReadDictionaryErr::InvalidDictionaryVersionErr);
     }
     if header.version == USER_DICT_VERSION_1 {
       return Err(ReadDictionaryErr::NotFoundGrammarErr);
     }
-    let grammar = Grammar::from_reader(&mut reader)?;
+    let grammar = Grammar::from_reader(reader)?;
 
-    let lexicon = DoubleArrayLexicon::from_reader(&mut reader)?;
+    let lexicon = DoubleArrayLexicon::from_reader(reader)?;
     Ok(BinaryDictionary::new(grammar, header, lexicon))
   }
   pub fn from_system_dictionary<P: AsRef<Path>>(
     filename: P,
   ) -> Result<BinaryDictionary, ReadDictionaryErr> {
-    let dictionary = BinaryDictionary::read_dictionary(filename)?;
+    let mut reader = BufReader::new(File::open(filename)?);
+    let dictionary = BinaryDictionary::read_dictionary_from_reader(&mut reader)?;
     if dictionary.header.version != SYSTEM_DICT_VERSION {
       return Err(ReadDictionaryErr::InvalidSystemDictionaryErr);
     }
@@ -84,8 +80,11 @@ impl BinaryDictionary {
   pub fn from_user_dictionary<P: AsRef<Path>>(
     filename: P,
   ) -> Result<BinaryDictionary, ReadDictionaryErr> {
-    let dictionary = BinaryDictionary::read_dictionary(filename)?;
-    if ![USER_DICT_VERSION_1, USER_DICT_VERSION_2].contains(&dictionary.header.version) {
+    let mut reader = BufReader::new(File::open(filename)?);
+    let dictionary = BinaryDictionary::read_dictionary_from_reader(&mut reader)?;
+    if USER_DICT_VERSION_1 != dictionary.header.version
+      && USER_DICT_VERSION_2 != dictionary.header.version
+    {
       return Err(ReadDictionaryErr::InvalidUserDictionaryErr);
     }
     Ok(dictionary)

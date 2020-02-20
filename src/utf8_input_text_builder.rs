@@ -1,7 +1,6 @@
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ops::Range;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use thiserror::Error;
 
@@ -9,7 +8,7 @@ use super::dictionary_lib::category_type::CategoryType;
 use super::dictionary_lib::grammar::{GetCharacterCategory, Grammar};
 use super::utf8_input_text::UTF8InputText;
 
-pub struct UTF8InputTextBuilder<G = Rc<RefCell<Grammar>>> {
+pub struct UTF8InputTextBuilder<G = Arc<Mutex<Grammar>>> {
   grammar: G,
   original_text: String,
   modified_text: String,
@@ -80,7 +79,7 @@ impl<G> UTF8InputTextBuilder<G> {
   }
 }
 
-impl<G: GetCharacterCategory> UTF8InputTextBuilder<Rc<RefCell<G>>> {
+impl<G: GetCharacterCategory> UTF8InputTextBuilder<Arc<Mutex<G>>> {
   pub fn build(self) -> UTF8InputText {
     let modified_text = self.get_text();
     let bytes = modified_text.clone().into_bytes();
@@ -122,7 +121,8 @@ impl<G: GetCharacterCategory> UTF8InputTextBuilder<Rc<RefCell<G>>> {
       .map(|c| {
         self
           .grammar
-          .borrow()
+          .lock()
+          .unwrap()
           .get_character_category()
           .as_ref()
           .unwrap()
@@ -195,6 +195,7 @@ fn get_char_category_continuous_length(
   char_categories.len() - offset
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -228,20 +229,18 @@ mod tests {
     }
   }
 
-  fn build_builder() -> UTF8InputTextBuilder<Rc<RefCell<MockGrammar>>> {
-    let mut character_category = CharacterCategory::default();
-    character_category
-      .read_character_definition(
-        PathBuf::from_str(file!())
-          .unwrap()
-          .parent()
-          .unwrap()
-          .join("resources/char.def"),
-      )
-      .unwrap();
+  fn build_builder() -> UTF8InputTextBuilder<Arc<Mutex<MockGrammar>>> {
+    let character_category = CharacterCategory::read_character_definition(
+      PathBuf::from_str(file!())
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("resources/char.def"),
+    )
+    .unwrap();
     let mut grammar = MockGrammar::new();
     grammar.set_character_category(Some(character_category));
-    UTF8InputTextBuilder::new(TEXT, Rc::new(RefCell::new(grammar)))
+    UTF8InputTextBuilder::new(TEXT, Arc::new(Mutex::new(grammar)))
   }
 
   #[test]

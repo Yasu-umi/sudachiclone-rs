@@ -1,35 +1,29 @@
-use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
+use std::convert::Infallible;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IOError};
-use std::marker::PhantomData;
-use std::rc::Rc;
+use std::path::Path;
 
 use thiserror::Error;
 use unicode_normalization::UnicodeNormalization;
 
-use super::input_text_plugin::{
-  InputTextPlugin, InputTextPluginReplaceErr, InputTextPluginSetupErr,
-};
+use super::input_text_plugin::{InputTextPluginReplaceErr, RewriteInputText};
 use crate::config::Config;
-use crate::dictionary_lib::grammar::Grammar;
 use crate::utf8_input_text_builder::UTF8InputTextBuilder;
 
-pub struct DefaultInputTextPlugin<G = Rc<RefCell<Grammar>>> {
-  phantom: PhantomData<G>,
-  rewrite_def_path: String,
-  key_lengths: HashMap<char, usize>,
-  replace_char_map: HashMap<Vec<u8>, String>,
-  ignore_normalize_set: HashSet<String>,
+type KeyLengths = HashMap<char, usize>;
+type ReplaceCharMap = HashMap<Vec<u8>, String>;
+type IgnoreNormalizeSet = HashSet<String>;
+
+pub struct DefaultInputTextPlugin {
+  key_lengths: KeyLengths,
+  replace_char_map: ReplaceCharMap,
+  ignore_normalize_set: IgnoreNormalizeSet,
 }
 
-impl<G> InputTextPlugin<G> for DefaultInputTextPlugin<G> {
-  fn setup(&mut self) -> Result<(), InputTextPluginSetupErr> {
-    self.read_rewrite_lists()?;
-    Ok(())
-  }
-  fn rewrite(
+impl RewriteInputText for DefaultInputTextPlugin {
+  fn rewrite<G>(
     &self,
     builder: &mut UTF8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr> {
@@ -109,30 +103,23 @@ pub enum DefaultInputTextPluginSetupErr {
   AlreadyDefinedErr(usize, String),
   #[error("invalid format at line {0}")]
   InvalidFormatErr(usize),
-  #[error("{self:?}")]
+  #[error("{0}")]
   IOError(#[from] IOError),
+  #[error("{0}")]
+  Infallible(#[from] Infallible),
 }
 
-impl<G> DefaultInputTextPlugin<G> {
-  pub fn new(config: &Config) -> DefaultInputTextPlugin<G> {
-    let rewrite_def_path = config
-      .resource_dir
-      .clone()
-      .join("rewrite.def")
-      .to_str()
-      .unwrap()
-      .to_string();
-    DefaultInputTextPlugin {
-      phantom: PhantomData,
-      rewrite_def_path,
-      key_lengths: HashMap::new(),
-      replace_char_map: HashMap::new(),
-      ignore_normalize_set: HashSet::new(),
-    }
+impl DefaultInputTextPlugin {
+  pub fn setup(config: &Config) -> Result<DefaultInputTextPlugin, DefaultInputTextPluginSetupErr> {
+    let rewrite_def_path = config.resource_dir.clone().join("rewrite.def");
+    DefaultInputTextPlugin::from_filepath(rewrite_def_path)
   }
-  fn read_rewrite_lists(&mut self) -> Result<(), DefaultInputTextPluginSetupErr> {
-    let f = File::open(&self.rewrite_def_path)?;
-    let reader = BufReader::new(f);
+  pub fn from_reader<R: BufRead>(
+    reader: &mut R,
+  ) -> Result<DefaultInputTextPlugin, DefaultInputTextPluginSetupErr> {
+    let mut key_lengths = HashMap::new();
+    let mut ignore_normalize_set = HashSet::new();
+    let mut replace_char_map = HashMap::new();
     for (i, line) in reader.lines().enumerate() {
       let line = line?;
       let line = line.trim();
@@ -147,38 +134,46 @@ impl<G> DefaultInputTextPlugin<G> {
         if key.chars().count() != 1 {
           return Err(DefaultInputTextPluginSetupErr::NotCharacterErr(i, key));
         }
-        self.ignore_normalize_set.insert(key);
+        ignore_normalize_set.insert(key);
       // replace char list
       } else if cols.len() == 2 {
         let key = cols[0].to_string();
-        if self.replace_char_map.contains_key(key.as_bytes()) {
+        if replace_char_map.contains_key(key.as_bytes()) {
           return Err(DefaultInputTextPluginSetupErr::AlreadyDefinedErr(i, key));
         }
         let c = key.chars().nth(0).unwrap();
-        if *self.key_lengths.get(&c).unwrap_or(&0) < key.chars().count() {
-          self.key_lengths.insert(c, key.chars().count());
+        if *key_lengths.get(&c).unwrap_or(&0) < key.chars().count() {
+          key_lengths.insert(c, key.chars().count());
         }
-        self
-          .replace_char_map
-          .insert(key.as_bytes().to_vec(), cols[1].to_string());
+        replace_char_map.insert(key.as_bytes().to_vec(), cols[1].to_string());
       } else {
         return Err(DefaultInputTextPluginSetupErr::InvalidFormatErr(i));
       }
     }
-    Ok(())
+    Ok(DefaultInputTextPlugin {
+      key_lengths,
+      replace_char_map,
+      ignore_normalize_set,
+    })
+  }
+  pub fn from_filepath<P: AsRef<Path>>(
+    rewrite_def_path: P,
+  ) -> Result<DefaultInputTextPlugin, DefaultInputTextPluginSetupErr> {
+    let mut reader = BufReader::new(File::open(rewrite_def_path)?);
+    DefaultInputTextPlugin::from_reader(&mut reader)
   }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::config::Config;
   use crate::dictionary_lib::character_category::CharacterCategory;
   use crate::dictionary_lib::grammar::{GetCharacterCategory, SetCharacterCategory};
-  use std::cell::RefCell;
   use std::path::PathBuf;
-  use std::rc::Rc;
   use std::str::FromStr;
+  use std::sync::{Arc, Mutex};
 
   fn resources_test_dir() -> PathBuf {
     PathBuf::from_str(file!())
@@ -192,17 +187,17 @@ mod tests {
 
   const ORIGINAL_TEXT: &str = "ÂＢΓД㈱ｶﾞウ゛⼼Ⅲ";
   const NORMALIZED_TEXT: &str = "âbγд(株)ガヴ⼼ⅲ";
-  type CelledMockGrammar = Rc<RefCell<MockGrammar>>;
+  type CelledMockGrammar = Arc<Mutex<MockGrammar>>;
 
   struct MockGrammar {
     character_category: Option<CharacterCategory>,
   }
   impl MockGrammar {
     fn new() -> MockGrammar {
-      let mut character_category = CharacterCategory::default();
-      character_category
-        .read_character_definition(resources_test_dir().join("char.def").as_path())
-        .unwrap();
+      let character_category = CharacterCategory::read_character_definition(
+        resources_test_dir().join("char.def").as_path(),
+      )
+      .unwrap();
       MockGrammar {
         character_category: Some(character_category),
       }
@@ -221,10 +216,10 @@ mod tests {
 
   fn setup() -> (
     UTF8InputTextBuilder<CelledMockGrammar>,
-    DefaultInputTextPlugin<CelledMockGrammar>,
+    DefaultInputTextPlugin,
   ) {
     let builder =
-      UTF8InputTextBuilder::new(ORIGINAL_TEXT, Rc::new(RefCell::new(MockGrammar::new())));
+      UTF8InputTextBuilder::new(ORIGINAL_TEXT, Arc::new(Mutex::new(MockGrammar::new())));
     let mut config = Config::empty().unwrap();
     config.resource_dir = PathBuf::from_str(file!())
       .unwrap()
@@ -233,8 +228,7 @@ mod tests {
       .parent()
       .unwrap()
       .join("resources");
-    let mut plugin = DefaultInputTextPlugin::<CelledMockGrammar>::new(&config);
-    plugin.setup().unwrap();
+    let plugin = DefaultInputTextPlugin::setup(&config).unwrap();
     (builder, plugin)
   }
 
@@ -291,31 +285,31 @@ mod tests {
 
   #[test]
   fn test_invalid_format_ignorelist() {
-    let config = Config::empty().unwrap();
-    let mut plugin = DefaultInputTextPlugin::<CelledMockGrammar>::new(&config);
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_ignorelist.def");
-    plugin.rewrite_def_path = rewrite_def_path_buf.to_str().unwrap().to_string();
-    let err = plugin.read_rewrite_lists().err().unwrap();
+    let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
+    let err = DefaultInputTextPlugin::from_reader(&mut reader)
+      .err()
+      .unwrap();
     assert_eq!("12 is not character at line 1", format!("{}", err));
   }
 
   #[test]
   fn test_invalid_format_replacelist() {
-    let config = Config::empty().unwrap();
-    let mut plugin = DefaultInputTextPlugin::<CelledMockGrammar>::new(&config);
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_replacelist.def");
-    plugin.rewrite_def_path = rewrite_def_path_buf.to_str().unwrap().to_string();
-    let err = plugin.read_rewrite_lists().err().unwrap();
+    let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
+    let err = DefaultInputTextPlugin::from_reader(&mut reader)
+      .err()
+      .unwrap();
     assert_eq!("invalid format at line 1", format!("{}", err));
   }
 
   #[test]
   fn test_duplicated_lines_replacelist() {
-    let config = Config::empty().unwrap();
-    let mut plugin = DefaultInputTextPlugin::<CelledMockGrammar>::new(&config);
     let rewrite_def_path_buf = resources_test_dir().join("rewrite_error_dup.def");
-    plugin.rewrite_def_path = rewrite_def_path_buf.to_str().unwrap().to_string();
-    let err = plugin.read_rewrite_lists().err().unwrap();
+    let mut reader = BufReader::new(File::open(rewrite_def_path_buf).unwrap());
+    let err = DefaultInputTextPlugin::from_reader(&mut reader)
+      .err()
+      .unwrap();
     assert_eq!("12 is already defined at line 2", format!("{}", err));
   }
 }

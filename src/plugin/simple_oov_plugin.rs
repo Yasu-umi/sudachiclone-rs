@@ -1,9 +1,9 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
+use thiserror::Error;
 
-use super::oov_provider_plugin::{OovProviderPlugin, OovProviderPluginSetupErr};
+use super::oov_provider_plugin::ProvideOov;
 use crate::dictionary_lib::grammar::GetPartOfSpeech;
 use crate::dictionary_lib::grammar::Grammar;
 use crate::dictionary_lib::word_info::WordInfo;
@@ -15,49 +15,50 @@ pub struct SimpleOovPlugin {
   left_id: u32,
   right_id: u32,
   cost: i32,
-  oov_pos_strings: Vec<String>,
   oov_pos_id: i16,
 }
 
+#[derive(Debug, Error)]
+pub enum SimpleOovPluginSetupErr {}
+
 impl SimpleOovPlugin {
-  pub fn new(json_obj: &Value) -> SimpleOovPlugin {
+  pub fn setup(
+    json_obj: &Value,
+    grammar: Arc<Mutex<Grammar>>,
+  ) -> Result<SimpleOovPlugin, SimpleOovPluginSetupErr> {
     let left_id = get_u64_by_key(json_obj, "leftId") as u32;
     let right_id = get_u64_by_key(json_obj, "rightId") as u32;
     let cost = get_i64_by_key(json_obj, "cost") as i32;
-    let oov_pos_strings = json_obj
+    let strings: Vec<&str> = json_obj
       .get("oovPOS")
       .map(|i| i.as_array())
       .flatten()
       .unwrap()
       .iter()
-      .map(|i| i.as_str().unwrap().to_string())
+      .map(|i| i.as_str().unwrap())
       .collect();
-    SimpleOovPlugin {
-      left_id,
-      right_id,
-      cost,
-      oov_pos_strings,
-      oov_pos_id: -1,
-    }
-  }
-}
-
-impl<T: InputText> OovProviderPlugin<T> for SimpleOovPlugin {
-  fn setup(&mut self, grammar: Rc<RefCell<Grammar>>) -> Result<(), OovProviderPluginSetupErr> {
-    let strings: Vec<&str> = self.oov_pos_strings.iter().map(|s| s.as_str()).collect();
-    self.oov_pos_id = grammar
-      .borrow()
+    let oov_pos_id = grammar
+      .lock()
+      .unwrap()
       .get_part_of_speech_id(&strings)
       .map(|i| i as i16)
       .unwrap_or(-1);
-    Ok(())
+    Ok(SimpleOovPlugin {
+      left_id,
+      right_id,
+      cost,
+      oov_pos_id,
+    })
   }
+}
+
+impl<T: InputText> ProvideOov<T> for &SimpleOovPlugin {
   fn provide_oov(
     &self,
     input_text: &T,
     offset: usize,
     has_other_words: bool,
-  ) -> Vec<Rc<RefCell<LatticeNode>>> {
+  ) -> Vec<Arc<Mutex<LatticeNode>>> {
     if !has_other_words {
       let mut node = LatticeNode::empty(self.left_id, self.right_id, self.cost);
       node.set_oov();
@@ -76,7 +77,7 @@ impl<T: InputText> OovProviderPlugin<T> for SimpleOovPlugin {
         word_structure: vec![],
       };
       node.set_word_info(info);
-      vec![Rc::new(RefCell::new(node))]
+      vec![Arc::new(Mutex::new(node))]
     } else {
       vec![]
     }
