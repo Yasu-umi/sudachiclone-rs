@@ -47,7 +47,7 @@ impl ProlongedSoundMarkInputTextPlugin {
     if let Some(Value::Array(marks)) = json_obj.get("prolongedSoundMarks") {
       for mark in marks {
         if let Value::String(psm) = mark {
-          psm_set.insert(psm.chars().nth(0).unwrap() as u32);
+          psm_set.insert(psm.chars().next().unwrap() as u32);
         }
       }
     }

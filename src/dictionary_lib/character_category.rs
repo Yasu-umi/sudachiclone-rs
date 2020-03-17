@@ -260,7 +260,7 @@ mod tests {
       category
         .get_category_types(code_point)
         .into_iter()
-        .nth(0)
+        .next()
         .unwrap()
     );
   }

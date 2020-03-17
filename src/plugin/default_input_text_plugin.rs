@@ -141,7 +141,7 @@ impl DefaultInputTextPlugin {
         if replace_char_map.contains_key(key.as_bytes()) {
           return Err(DefaultInputTextPluginSetupErr::AlreadyDefinedErr(i, key));
         }
-        let c = key.chars().nth(0).unwrap();
+        let c = key.chars().next().unwrap();
         if *key_lengths.get(&c).unwrap_or(&0) < key.chars().count() {
           key_lengths.insert(c, key.chars().count());
         }
