@@ -132,7 +132,7 @@ impl Lattice {
         l_node.lock().unwrap().right_id as usize,
         node.left_id as usize,
       );
-      costs.push(format!("{}", cost));
+      costs.push(cost.to_string());
     }
     info!(
       "{}: {} {} {}({}) {} {} {} {}: {}",
