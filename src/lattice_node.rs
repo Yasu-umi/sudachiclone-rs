@@ -147,6 +147,25 @@ impl LatticeNode {
       self.start, self.end, surface, self.word_id, self.left_id, self.right_id, self.cost,
     )
   }
+  pub fn clone_from_mutex(node: &Arc<Mutex<LatticeNode>>) -> LatticeNode {
+    let n = node.lock().unwrap();
+    LatticeNode {
+      id: n.id,
+      start: n.start,
+      end: n.end,
+      total_cost: n.total_cost,
+      word_id: n.word_id,
+      _is_oov: n._is_oov,
+      is_defined: n.is_defined,
+      best_previous_node: n.best_previous_node.clone(),
+      is_connected_to_bos: n.is_connected_to_bos,
+      extra_word_info: n.extra_word_info.clone(),
+      lexicon: n.lexicon.clone(),
+      left_id: n.left_id,
+      right_id: n.right_id,
+      cost: n.cost,
+    }
+  }
 }
 
 const NULL_SURFACE: &str = "(null)";
@@ -172,6 +191,7 @@ impl fmt::Debug for LatticeNode {
     Ok(())
   }
 }
+
 impl PartialEq for LatticeNode {
   fn eq(&self, other: &Self) -> bool {
     self.id == other.id

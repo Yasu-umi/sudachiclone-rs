@@ -1,6 +1,5 @@
 use std::char::from_u32;
 use std::collections::HashMap;
-use std::error::Error;
 use std::io::{BufRead, Cursor, Error as IOError, Seek, SeekFrom, Write};
 use std::num::ParseIntError;
 use std::str::FromStr;
@@ -123,7 +122,7 @@ impl DictionaryBuilder {
       match self.build_lexicon(record) {
         Ok(_) => (),
         Err(e) => {
-          error!("{} as line {} in {}", e.description(), i + 1, path);
+          error!("{} as line {} in {}", e, i + 1, path);
           return Err(e);
         }
       }

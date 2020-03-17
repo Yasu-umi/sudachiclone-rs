@@ -113,7 +113,7 @@ impl Lattice {
   pub fn connect_eos_node(&mut self) {
     self.connect_node(self.eos_node.as_ref().unwrap().lock().unwrap());
   }
-  fn log_node(&self, node: MutexGuard<LatticeNode>, index: &mut usize) {
+  fn log_node(&self, node: &LatticeNode, index: &mut usize) {
     let grammar = self.grammar.lock().unwrap();
     let mut surface = String::from("(null)");
     let mut pos = String::from("BOS/EOS");
@@ -158,10 +158,13 @@ impl Lattice {
       let i = self.size + 1 - i;
       if i <= self.size {
         for r_node in self.end_lists[i].iter() {
-          self.log_node(r_node.lock().unwrap(), &mut index);
+          self.log_node(&LatticeNode::clone_from_mutex(r_node), &mut index);
         }
       } else {
-        self.log_node(self.eos_node.as_ref().unwrap().lock().unwrap(), &mut index);
+        self.log_node(
+          &LatticeNode::clone_from_mutex(self.eos_node.as_ref().unwrap()),
+          &mut index,
+        );
       }
     }
   }
