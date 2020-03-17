@@ -218,7 +218,7 @@ fn log_path(path: &[Arc<Mutex<LatticeNode>>]) {
     return;
   }
   for (i, node) in path.iter().enumerate() {
-    info!("{}: {:?}￿", i, node.lock().unwrap());
+    info!("{}: {:?}", i, node.lock().unwrap());
   }
 }
 
