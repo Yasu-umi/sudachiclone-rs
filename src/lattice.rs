@@ -153,7 +153,7 @@ impl Lattice {
     if !log_enabled!(Level::Info) {
       return;
     }
-    let mut index = 0;
+    let mut index = 1;
     for i in 0..=(self.size + 1) {
       let i = self.size + 1 - i;
       if i <= self.size {
