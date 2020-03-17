@@ -343,4 +343,24 @@ mod tests {
     assert_eq!(1, tokenizer.tokenize("ab", &None, None).unwrap().len());
     assert_eq!(2, tokenizer.tokenize("特ab", &None, None).unwrap().len());
   }
+
+  #[test]
+  fn test_tokenize_multiline_sentences() {
+    let (_, tokenizer) = &build_tokenizer();
+    let ms = tokenizer
+      .tokenize("我輩は猫である。\n名前はまだない。", &None, None)
+      .unwrap();
+    assert_eq!(17, ms.len());
+    assert_eq!(
+      vec![
+        String::from("名詞"),
+        String::from("普通名詞"),
+        String::from("一般"),
+        String::from("*"),
+        String::from("*"),
+        String::from("*")
+      ],
+      ms.get(0).unwrap().part_of_speech()
+    )
+  }
 }

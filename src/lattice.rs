@@ -69,7 +69,7 @@ impl Lattice {
   fn connect_node(&self, mut r_node: MutexGuard<LatticeNode>) {
     let start = r_node.start;
     let grammar = self.grammar.lock().unwrap();
-    r_node.total_cost = i16::max_value() as i32;
+    r_node.total_cost = i32::max_value();
     for l_node in self.end_lists[start].iter() {
       let _l_node = l_node.lock().unwrap();
       if !_l_node.is_connected_to_bos {
