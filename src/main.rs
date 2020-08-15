@@ -48,7 +48,7 @@ fn tokenize(args: &ArgMatches) {
   loop {
     while let Ok(_) = stdin().read_line(&mut input) {
       for line in input.trim().split('\n') {
-        if let Some(morpheme_list) = tokenizer.tokenize(line, &mode, None) {
+        if let Some(morpheme_list) = tokenizer.tokenize(line, mode, None) {
           for morpheme in morpheme_list {
             println!("{}", morpheme.to_string(print_all).join("\t"));
           }

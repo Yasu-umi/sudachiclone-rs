@@ -8,18 +8,18 @@
 //! // using `system_core.dic` or `system_full.dic` version 20190781
 //! // you may not be able to replicate this particular example due to dictionary you use
 //!
-//! for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::C), None).unwrap() {
+//! for m in tokenizer.tokenize("国家公務員", Some(SplitMode::C), None).unwrap() {
 //!     println!("{}", m.surface());
 //! };
 //! // => 国家公務員
 //!
-//! for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::B), None).unwrap() {
+//! for m in tokenizer.tokenize("国家公務員", Some(SplitMode::B), None).unwrap() {
 //!     println!("{}", m.surface());
 //! };
 //! // => 国家
 //! // => 公務員
 //!
-//! for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::A), None).unwrap() {
+//! for m in tokenizer.tokenize("国家公務員", Some(SplitMode::A), None).unwrap() {
 //!     println!("{}", m.surface());
 //! };
 //! // => 国家
@@ -28,7 +28,7 @@
 //!
 //! // Morpheme information
 //!
-//! let m = tokenizer.tokenize("食べ", &Some(SplitMode::A), None).unwrap().get(0).unwrap();
+//! let m = tokenizer.tokenize("食べ", Some(SplitMode::A), None).unwrap().get(0).unwrap();
 //! println!("{}", m.surface());
 //! // => 食べ
 //! println!("{}", m.dictionary_form());
@@ -40,13 +40,13 @@
 //!
 //! // Normalization
 //!
-//! println!("{}", tokenizer.tokenize("附属", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
+//! println!("{}", tokenizer.tokenize("附属", Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
 //! // => 付属
 //!
-//! println!("{}", tokenizer.tokenize("SUMMER", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
+//! println!("{}", tokenizer.tokenize("SUMMER", Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
 //! // => サマー
 //!
-//! println!("{}", tokenizer.tokenize("シュミレーション", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
+//! println!("{}", tokenizer.tokenize("シュミレーション", Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
 //! // => シミュレーション
 //! ```
 
