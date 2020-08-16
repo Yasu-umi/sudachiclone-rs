@@ -3,11 +3,11 @@ use std::ffi::OsStr;
 use std::fs::{symlink_metadata, File};
 use std::io::{BufReader, Error as IOError, ErrorKind as IOErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::string::FromUtf8Error;
 
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use serde_json::{error::Error as SerdeError, Value};
 #[cfg(any(target_os = "redox", unix, windows))]
 use symlink::{remove_symlink_dir, symlink_dir};
@@ -161,12 +161,12 @@ pub enum SudachiDictErr {
   SetDefaultDictErr,
   #[error("unlink faild (dictionary exists)")]
   UnlinkFaildErr,
+  #[error("{0}")]
+  ConfigErr(#[from] ConfigErr),
 }
 
-fn get_python_package_path_cmd_python(
-  python_exe: &OsStr,
-  pkg_name: &str,
-) -> Result<Child, IOError> {
+/// Get path to Python package with `pkg_name`
+fn get_python_package_path_helper(python_exe: &OsStr, pkg_name: &str) -> Result<String, ConfigErr> {
   debug!(
     "Searching for Python package {pkg_name} with Python {python_exe:?}",
     python_exe = python_exe,
@@ -188,60 +188,55 @@ exit()
     .stdout(Stdio::piped())
     .spawn()?;
   child.stdin.as_mut().unwrap().write_all(cmd.as_bytes())?;
-  Ok(child)
+
+  let output = child.wait_with_output()?;
+  if output.status.success() {
+    Ok(String::from_utf8(output.stdout)?.trim().to_string())
+  } else {
+    trace!(
+      "Python process failed: stdout:\n{}\nstderr: {}",
+      String::from_utf8_lossy(&output.stdout),
+      String::from_utf8_lossy(&output.stderr)
+    );
+    Err(IOError::new(IOErrorKind::NotFound, "Python process failed").into())
+  }
 }
 
 /// Spawn child process that will try to print the path of a Python module
-fn get_python_package_path_cmd(
+fn get_python_package_path(
   python_exe: Option<&OsStr>,
   pkg_name: &str,
-) -> Result<Child, IOError> {
+) -> Result<String, ConfigErr> {
   if let Some(python_exe) = python_exe {
-    return get_python_package_path_cmd_python(python_exe, pkg_name);
+    return get_python_package_path_helper(python_exe, pkg_name);
   }
 
   // No python specified; try these in order
   const TRY_PYTHON_NAMES: &[&str] = &["python3", "python", "python2"];
   for python_exe in TRY_PYTHON_NAMES.into_iter() {
-    if let Ok(child) = get_python_package_path_cmd_python(python_exe.as_ref(), pkg_name) {
+    if let Ok(child) = get_python_package_path_helper(python_exe.as_ref(), pkg_name) {
       return Ok(child);
     }
   }
   error!("Unable to find valid python installation");
-  Err(IOError::new(IOErrorKind::NotFound, ""))
+  Err(IOError::new(IOErrorKind::NotFound, "No valid python installation found").into())
 }
 
 fn success_import(python_exe: Option<&OsStr>, pkg_name: &str) -> bool {
-  match get_python_package_path_cmd(python_exe, pkg_name) {
-    Ok(cmd) => {
-      let output = cmd.wait_with_output();
-      match output {
-        Ok(o) => o.status.success(),
-        Err(_) => false,
-      }
-    }
-    Err(_) => false,
-  }
+  get_python_package_path(python_exe, pkg_name).is_ok()
 }
 
 fn unlink_default_dict_package(python_exe: Option<&OsStr>) -> Result<(), SudachiDictErr> {
-  if let Some(dst_path) = get_python_package_path_cmd(python_exe, SUDACHIDICT_PKG_NAME)?
-    .wait_with_output()
-    .map(|o| String::from_utf8(o.stdout).ok())
-    .ok()
-    .and_then(|x| x)
-  {
-    let dst_path = dst_path.trim();
-    if !dst_path.is_empty() {
-      if symlink_metadata(&dst_path)?.file_type().is_symlink() {
-        remove_symlink_dir(&dst_path)?;
-      }
-      return if Path::new(&dst_path).exists() {
-        Err(SudachiDictErr::UnlinkFaildErr)
-      } else {
-        Ok(())
-      };
+  let dst_path = get_python_package_path(python_exe, SUDACHIDICT_PKG_NAME)?;
+  if !dst_path.is_empty() {
+    if symlink_metadata(&dst_path)?.file_type().is_symlink() {
+      remove_symlink_dir(&dst_path)?;
     }
+    return if Path::new(&dst_path).exists() {
+      Err(SudachiDictErr::UnlinkFaildErr)
+    } else {
+      Ok(())
+    };
   }
   Ok(())
 }
@@ -251,12 +246,7 @@ fn set_default_dict_package(
   dict_pkg_name: &str,
 ) -> Result<String, SudachiDictErr> {
   unlink_default_dict_package(python_exe)?;
-  let src_path = String::from_utf8(
-    get_python_package_path_cmd(python_exe, dict_pkg_name)?
-      .wait_with_output()?
-      .stdout,
-  )?;
-  let src_path = src_path.trim();
+  let src_path = get_python_package_path(python_exe, dict_pkg_name)?;
   let dst_path = ok_or_io_err(PathBuf::from_str(&src_path)?.parent(), "NotFoundParentDir")?
     .join(SUDACHIDICT_PKG_NAME);
   symlink_dir(&src_path, &dst_path)?;
@@ -264,12 +254,9 @@ fn set_default_dict_package(
 }
 
 fn get_sudachi_py_package_path(python_exe: Option<&OsStr>) -> Result<String, SudachiDictErr> {
-  let output = get_python_package_path_cmd(python_exe, SUDACHIDICT_PKG_NAME)?.wait_with_output()?;
-  if output.status.success() {
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
-  } else {
-    Err(SudachiDictErr::NotFoundSudachiDictCoreErr)
-  }
+  let path = get_python_package_path(python_exe, SUDACHIDICT_PKG_NAME)
+    .map_err(|_| SudachiDictErr::NotFoundSudachiDictCoreErr)?;
+  Ok(path)
 }
 
 pub fn create_default_link_for_sudachidict_core(
