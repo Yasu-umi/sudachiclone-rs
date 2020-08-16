@@ -11,6 +11,11 @@ use serde_json::{error::Error as SerdeError, Value};
 use symlink::{remove_symlink_dir, symlink_dir};
 use thiserror::Error;
 
+const SUDACHIDICT_PKG_NAME: &str = "sudachidict";
+const SUDACHIDICT_CORE_PKG_NAME: &str = "sudachidict_core";
+const SUDACHIDICT_FULL_PKG_NAME: &str = "sudachidict_full";
+const SUDACHIDICT_SMALL_PKG_NAME: &str = "sudachidict_small";
+
 #[cfg(not(any(target_os = "redox", unix, windows)))]
 fn remove_symlink_dir<P: AsRef<Path>>(_path: P) -> Result<(), IOError> {
   Err(IOError::new(
@@ -68,6 +73,7 @@ impl Config {
       resource_dir: dir.join("resources"),
     })
   }
+
   pub fn setup(path: Option<&str>, resource_dir: Option<&str>) -> Result<Config, ConfigErr> {
     let mut config = Config::empty()?;
     let default_setting_file = config.DEFAULT_SETTINGFILE.to_path_buf();
@@ -93,6 +99,7 @@ impl Config {
     config.settings = settings;
     Ok(config)
   }
+
   pub fn system_dict_path(&mut self) -> Result<PathBuf, SudachiDictErr> {
     if let Some(Value::String(p)) = self.settings.get("systemDict") {
       let path = self.resource_dir.join(p);
@@ -100,13 +107,14 @@ impl Config {
         return Ok(path);
       }
     }
-    let dict_path = create_default_link_for_sudachidict_core()?;
+    let dict_path = get_sudachi_dict_path()?;
     self.settings.as_object_mut().unwrap().insert(
       String::from("systemDict"),
       Value::String(dict_path.to_str().unwrap().to_string()),
     );
     Ok(dict_path)
   }
+
   pub fn char_def_path(&self) -> Result<PathBuf, ConfigErr> {
     if let Some(Value::String(p)) = self.settings.get("characterDefinitionFile") {
       let path = self.resource_dir.join(p);
@@ -116,6 +124,7 @@ impl Config {
     }
     Err(ConfigErr::CharDefiFileNotFoundError)
   }
+
   pub fn user_dict_paths(&self) -> Vec<PathBuf> {
     let mut paths = vec![];
     if let Some(Value::Array(arr)) = self.settings.get("userDict") {
@@ -149,7 +158,9 @@ pub enum SudachiDictErr {
   UnlinkFaildErr,
 }
 
-fn get_pip_pkg_path_cmd(pkg_name: &str) -> Result<Child, IOError> {
+/// Spawn child process that will try to print the path of a Python module
+fn get_python_package_path_cmd(pkg_name: &str) -> Result<Child, IOError> {
+  // todo(tmfink): make compatible with python 2 and 3
   let cmd = format!(
     r#"
 from importlib import import_module
@@ -169,7 +180,7 @@ exit()
 }
 
 fn success_import(pkg_name: &str) -> bool {
-  match get_pip_pkg_path_cmd(pkg_name) {
+  match get_python_package_path_cmd(pkg_name) {
     Ok(cmd) => {
       let output = cmd.wait_with_output();
       match output {
@@ -182,7 +193,7 @@ fn success_import(pkg_name: &str) -> bool {
 }
 
 fn unlink_default_dict_package() -> Result<(), SudachiDictErr> {
-  if let Some(dst_path) = get_pip_pkg_path_cmd("sudachidict")?
+  if let Some(dst_path) = get_python_package_path_cmd(SUDACHIDICT_PKG_NAME)?
     .wait_with_output()
     .map(|o| String::from_utf8(o.stdout).ok())
     .ok()
@@ -206,36 +217,43 @@ fn unlink_default_dict_package() -> Result<(), SudachiDictErr> {
 fn set_default_dict_package(dict_pkg_name: &str) -> Result<String, SudachiDictErr> {
   unlink_default_dict_package()?;
   let src_path = String::from_utf8(
-    get_pip_pkg_path_cmd(dict_pkg_name)?
+    get_python_package_path_cmd(dict_pkg_name)?
       .wait_with_output()?
       .stdout,
   )?;
   let src_path = src_path.trim();
-  let dst_path =
-    ok_or_io_err(PathBuf::from_str(&src_path)?.parent(), "NotFoundParentDir")?.join("sudachidict");
+  let dst_path = ok_or_io_err(PathBuf::from_str(&src_path)?.parent(), "NotFoundParentDir")?
+    .join(SUDACHIDICT_PKG_NAME);
   symlink_dir(&src_path, &dst_path)?;
   Ok(dst_path.to_str().unwrap().to_string())
 }
 
-fn get_dict_path() -> Result<String, SudachiDictErr> {
-  if let Ok(output) = get_pip_pkg_path_cmd("sudachidict")?.wait_with_output() {
-    if output.status.success() {
-      return Ok(String::from_utf8(output.stdout)?.trim().to_string());
-    }
+fn get_sudachi_py_package_path() -> Result<String, SudachiDictErr> {
+  let output = get_python_package_path_cmd(SUDACHIDICT_PKG_NAME)?.wait_with_output()?;
+  if output.status.success() {
+    Ok(String::from_utf8(output.stdout)?.trim().to_string())
+  } else {
+    Err(SudachiDictErr::NotFoundSudachiDictCoreErr)
   }
-  if !success_import("sudachidict_core") {
-    return Err(SudachiDictErr::NotFoundSudachiDictCoreErr);
-  }
-  if success_import("sudachidict_full") {
-    return Err(SudachiDictErr::SetDefaultDictErr);
-  }
-  if success_import("sudachidict_small") {
-    return Err(SudachiDictErr::SetDefaultDictErr);
-  }
-  set_default_dict_package("sudachidict_core")
 }
 
-fn create_default_link_for_sudachidict_core() -> Result<PathBuf, SudachiDictErr> {
-  let dict_path = get_dict_path()?;
-  Ok(PathBuf::from_str(&dict_path)?.join("resources/system.dic"))
+fn create_default_link_for_sudachidict_core() -> Result<(), SudachiDictErr> {
+  get_sudachi_dict_path()?;
+  if !success_import(SUDACHIDICT_CORE_PKG_NAME) {
+    return Err(SudachiDictErr::NotFoundSudachiDictCoreErr);
+  }
+  if success_import(SUDACHIDICT_FULL_PKG_NAME) {
+    return Err(SudachiDictErr::SetDefaultDictErr);
+  }
+  if success_import(SUDACHIDICT_SMALL_PKG_NAME) {
+    return Err(SudachiDictErr::SetDefaultDictErr);
+  }
+
+  set_default_dict_package(SUDACHIDICT_CORE_PKG_NAME);
+  Ok(())
+}
+
+fn get_sudachi_dict_path() -> Result<PathBuf, SudachiDictErr> {
+  let package_path = get_sudachi_py_package_path()?;
+  Ok(PathBuf::from_str(&package_path)?.join("resources/system.dic"))
 }
