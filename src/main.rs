@@ -6,7 +6,7 @@ use std::process::exit;
 
 use clap::{crate_name, crate_version, App, Arg, ArgMatches, SubCommand};
 
-use sudachiclone::config::Config;
+use sudachiclone::config::{Config, create_default_link_for_sudachidict_core};
 use sudachiclone::dictionary::Dictionary;
 use sudachiclone::dictionary_lib::binary_dictionary::BinaryDictionary;
 use sudachiclone::dictionary_lib::dictionary_builder::DictionaryBuilder;
@@ -16,6 +16,12 @@ use sudachiclone::dictionary_lib::system_dictionary_version::{
 };
 use sudachiclone::dictionary_lib::user_dictionary_builder::UserDictionaryBuilder;
 use sudachiclone::tokenizer::{CanTokenize, SplitMode};
+
+const TOKENIZE_SUB_CMD: &str = "tokenize";
+const LINK_SUB_CMD: &str = "link";
+const BUILD_SUB_CMD: &str = "build";
+const UBUILD_SUB_CMD: &str = "ubuild";
+
 
 fn unwrap<T, E: Error>(t: Result<T, E>) -> T {
   match t {
@@ -57,6 +63,10 @@ fn tokenize(args: &ArgMatches) {
       println!("EOS");
     }
   }
+}
+
+fn link(_args: &ArgMatches) {
+  unwrap(create_default_link_for_sudachidict_core());
 }
 
 fn build(args: &ArgMatches) {
@@ -120,7 +130,7 @@ fn in_files_validator(in_file: String) -> Result<(), String> {
 }
 
 fn main() {
-  let tokenize_subcommand = SubCommand::with_name("tokenize")
+  let tokenize_subcommand = SubCommand::with_name(TOKENIZE_SUB_CMD)
     .about("Tokenize Text")
     .help_message("(default) see `tokenize -h`")
     .arg(
@@ -165,7 +175,7 @@ fn main() {
         .validator(in_files_validator),
     );
 
-  let link_subcommand = SubCommand::with_name("link")
+  let link_subcommand = SubCommand::with_name(LINK_SUB_CMD)
     .about("Link Default Dict Package")
     .help_message("see `link -h`")
     .arg(
@@ -177,7 +187,7 @@ fn main() {
         .help("dict dict"),
     );
 
-  let build_subcommand = SubCommand::with_name("build")
+  let build_subcommand = SubCommand::with_name(BUILD_SUB_CMD)
     .about("Build Sudachi Dictionary")
     .help_message("see `build -h`")
     .arg(
@@ -217,7 +227,7 @@ fn main() {
         .help("source files with CSV format (one of more)"),
     );
 
-  let ubuild_subcommand = SubCommand::with_name("ubuild")
+  let ubuild_subcommand = SubCommand::with_name(UBUILD_SUB_CMD)
     .about("Build User Dictionary")
     .help_message("see `ubuild -h`")
     .arg(
@@ -246,19 +256,22 @@ fn main() {
         .help("source files with CSV format (one of more)"),
     );
 
-  let app = App::new("Japanese Morphological Analyzer")
+  // todo(tmfink): add argument to specify python location
+  let mut app = App::new("Japanese Morphological Analyzer")
     .subcommand(tokenize_subcommand)
     .subcommand(link_subcommand)
     .subcommand(build_subcommand)
     .subcommand(ubuild_subcommand);
-  let matches = app.get_matches();
-  if let Some(tokenize_matches) = matches.subcommand_matches("tokenize") {
-    tokenize(tokenize_matches);
-  } else if let Some(build_matches) = matches.subcommand_matches("build") {
-    build(build_matches);
-  } else if let Some(ubuild_matches) = matches.subcommand_matches("ubuild") {
-    ubuild(ubuild_matches);
-  } else {
-    tokenize(&matches);
+  let matches = app.clone().get_matches();
+
+  match  matches.subcommand() {
+    (TOKENIZE_SUB_CMD, Some(tokenize_matches)) => tokenize(tokenize_matches),
+    (LINK_SUB_CMD, Some(link_matches)) => link(link_matches),
+    (BUILD_SUB_CMD, Some(build_matches)) => build(build_matches),
+    (UBUILD_SUB_CMD, Some(ubuild_matches)) => ubuild(ubuild_matches),
+    _ => {
+      app.print_help().expect("Unable to write help");
+      println!();
+    }
   }
 }

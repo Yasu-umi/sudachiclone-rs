@@ -237,7 +237,7 @@ fn get_sudachi_py_package_path() -> Result<String, SudachiDictErr> {
   }
 }
 
-fn create_default_link_for_sudachidict_core() -> Result<(), SudachiDictErr> {
+pub fn create_default_link_for_sudachidict_core() -> Result<(), SudachiDictErr> {
   get_sudachi_dict_path()?;
   if !success_import(SUDACHIDICT_CORE_PKG_NAME) {
     return Err(SudachiDictErr::NotFoundSudachiDictCoreErr);
@@ -249,7 +249,7 @@ fn create_default_link_for_sudachidict_core() -> Result<(), SudachiDictErr> {
     return Err(SudachiDictErr::SetDefaultDictErr);
   }
 
-  set_default_dict_package(SUDACHIDICT_CORE_PKG_NAME);
+  set_default_dict_package(SUDACHIDICT_CORE_PKG_NAME)?;
   Ok(())
 }
 
