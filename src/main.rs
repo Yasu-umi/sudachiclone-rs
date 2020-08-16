@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::{stdin, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::str::FromStr;
@@ -73,17 +73,22 @@ fn tokenize(args: &ArgMatches) {
 
   let mut input = String::new();
   let print_all = args.is_present(PRINT_ALL_ARG);
-  loop {
-    while let Ok(_) = stdin().read_line(&mut input) {
-      for line in input.trim().split('\n') {
-        if let Some(morpheme_list) = tokenizer.tokenize(line, mode, None) {
-          for morpheme in morpheme_list {
-            println!("{}", morpheme.to_string(print_all).join("\t"));
-          }
+
+  let stdin = std::io::stdin();
+  let mut handle = stdin.lock();
+
+  while let Ok(bytes_read) = handle.read_line(&mut input) {
+    if bytes_read == 0 {
+      break;
+    }
+    for line in input.trim().split('\n') {
+      if let Some(morpheme_list) = tokenizer.tokenize(line, mode, None) {
+        for morpheme in morpheme_list {
+          println!("{}", morpheme.to_string(print_all).join("\t"));
         }
       }
-      println!("EOS");
     }
+    println!("EOS");
   }
 }
 
@@ -240,13 +245,13 @@ fn main() {
         .possible_values(&["A", "B", "C"])
         .help("the mode of splitting"),
     )
+    // todo(Yasu-umi) FPATH_OUT_ARG is unused
     .arg(
       Arg::with_name(FPATH_OUT_ARG)
         .short("o")
         .takes_value(true)
         .help("the output file"),
     )
-    // todo(Yasu-umi) arg is unused
     .arg(
       Arg::with_name(PRINT_ALL_ARG)
         .short("a")
