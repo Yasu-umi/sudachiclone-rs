@@ -3,8 +3,11 @@ use std::fs::File;
 use std::io::{stdin, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
+use std::str::FromStr;
 
 use clap::{crate_name, crate_version, App, Arg, ArgMatches, SubCommand};
+use log::info;
+use stderrlog;
 
 use sudachiclone::config::{create_default_link_for_sudachidict_core, Config};
 use sudachiclone::dictionary::Dictionary;
@@ -29,13 +32,15 @@ const DICT_TYPE_ARG: &str = "dict_type";
 const FPATH_OUT_ARG: &str = "fpath_out";
 const FPATH_SETTING_ARG: &str = "fpath_setting";
 const IN_FILES_ARG: &str = "in_files";
+const LOG_TIMESTAMP_ARG: &str = "timestamp";
 const MATRIX_FILE_ARG: &str = "matrix_file";
 const MODE_ARG: &str = "mode";
 const OUT_FILE_ARG: &str = "out_file";
 const PYTHON_BIN_ARG: &str = "python_exe";
+const QUIET_ARG: &str = "quiet";
 const PRINT_ALL_ARG: &str = "print_all";
-const PRINT_DEBUG_ARG: &str = "print_debug";
 const SYSTEM_DIC_ARG: &str = "system_dic";
+const VERBOSE_ARG: &str = "verbose";
 const VERSION_ARG: &str = "version";
 
 fn unwrap<T, E: Error>(t: Result<T, E>) -> T {
@@ -149,16 +154,73 @@ fn in_files_validator(in_file: String) -> Result<(), String> {
   }
 }
 
-fn add_python_exe_arg<'a, 'b>(app: clap::App<'a, 'b>) -> clap::App<'a, 'b> {
-  app.arg(
-    Arg::with_name(PYTHON_BIN_ARG)
-      .short("p")
-      .takes_value(true)
-      .help("path to Python executable")
-      .long_help(
-        "path to Python executable (used to detect sudachi Python module install location)",
-      ),
-  )
+trait ClapAppExt {
+  fn add_python_exe_arg(self) -> Self;
+  fn add_log_args(self) -> Self;
+}
+
+impl<'a, 'b> ClapAppExt for clap::App<'a, 'b> {
+  fn add_python_exe_arg(self) -> Self {
+    self.arg(
+      Arg::with_name(PYTHON_BIN_ARG)
+        .short("p")
+        .takes_value(true)
+        .help("path to Python executable")
+        .long_help(
+          "path to Python executable (used to detect sudachi Python module install location)",
+        ),
+    )
+  }
+
+  fn add_log_args(self) -> Self {
+    self
+      .arg(
+        Arg::with_name(VERBOSE_ARG)
+          .short("v")
+          .multiple(true)
+          .help("Increase message verbosity"),
+      )
+      .arg(
+        Arg::with_name(QUIET_ARG)
+          .short("q")
+          .help("Silence all output"),
+      )
+      .arg(
+        Arg::with_name(LOG_TIMESTAMP_ARG)
+          .short("z")
+          .help("prepend timestamp to log lines")
+          .takes_value(true)
+          .possible_values(&["none", "sec", "ms", "ns"]),
+      )
+  }
+}
+
+fn setup_logging(matches: &clap::ArgMatches) {
+  use log::*;
+  let verbosity = matches.occurrences_of(VERBOSE_ARG) as usize + 1;
+  let quiet = matches.is_present(QUIET_ARG);
+  let ts = matches
+    .value_of(LOG_TIMESTAMP_ARG)
+    .map(|v| {
+      stderrlog::Timestamp::from_str(v).unwrap_or_else(|_| {
+        clap::Error {
+          message: "invalid value for 'timestamp'".into(),
+          kind: clap::ErrorKind::InvalidValue,
+          info: None,
+        }
+        .exit()
+      })
+    })
+    .unwrap_or(stderrlog::Timestamp::Off);
+
+  stderrlog::new()
+    .module(module_path!())
+    .quiet(quiet)
+    .verbosity(verbosity)
+    .timestamp(ts)
+    .init()
+    .unwrap();
+  info!("setup logging to level {} (quiet={})", verbosity, quiet);
 }
 
 fn main() {
@@ -184,21 +246,15 @@ fn main() {
         .takes_value(true)
         .help("the output file"),
     )
-    // unused
+    // todo(Yasu-umi) arg is unused
     .arg(
       Arg::with_name(PRINT_ALL_ARG)
         .short("a")
         .help("print all of the fields"),
     )
-    // todo(tmfink): add debug printing
-    .arg(
-      Arg::with_name(PRINT_DEBUG_ARG)
-        .short("d")
-        .help("print the debug information"),
-    )
     .arg(
       Arg::with_name(VERSION_ARG)
-        .short("v")
+        .short("V")
         .help("print sudachipy version"),
     )
     .arg(
@@ -207,8 +263,9 @@ fn main() {
         .multiple(true)
         .help("text written in utf-8")
         .validator(in_files_validator),
-    );
-  let tokenize_subcommand = add_python_exe_arg(tokenize_subcommand);
+    )
+    .add_python_exe_arg()
+    .add_log_args();
 
   let link_subcommand = SubCommand::with_name(LINK_SUB_CMD)
     .about("Link Default Dict Package")
@@ -220,8 +277,9 @@ fn main() {
         .possible_values(&["small", "core", "full"])
         .default_value("core")
         .help("dict dict"),
-    );
-  let link_subcommand = add_python_exe_arg(link_subcommand);
+    )
+    .add_python_exe_arg()
+    .add_log_args();
 
   let build_subcommand = SubCommand::with_name(BUILD_SUB_CMD)
     .about("Build Sudachi Dictionary")
@@ -261,7 +319,8 @@ fn main() {
       Arg::with_name(IN_FILES_ARG)
         .takes_value(true)
         .help("source files with CSV format (one of more)"),
-    );
+    )
+    .add_log_args();
 
   let ubuild_subcommand = SubCommand::with_name(UBUILD_SUB_CMD)
     .about("Build User Dictionary")
@@ -290,16 +349,18 @@ fn main() {
       Arg::with_name(IN_FILES_ARG)
         .takes_value(true)
         .help("source files with CSV format (one of more)"),
-    );
+    )
+    .add_log_args();
 
-  // todo(tmfink): add argument to specify python location
   let mut app = App::new("Japanese Morphological Analyzer")
     .subcommand(tokenize_subcommand)
     .subcommand(link_subcommand)
     .subcommand(build_subcommand)
-    .subcommand(ubuild_subcommand);
+    .subcommand(ubuild_subcommand)
+    .add_log_args();
   let matches = app.clone().get_matches();
 
+  setup_logging(&matches);
   match matches.subcommand() {
     (TOKENIZE_SUB_CMD, Some(tokenize_matches)) => tokenize(tokenize_matches),
     (LINK_SUB_CMD, Some(link_matches)) => link(link_matches),
