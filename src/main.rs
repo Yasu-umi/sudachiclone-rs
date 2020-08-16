@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -18,7 +18,7 @@ use sudachiclone::dictionary_lib::system_dictionary_version::{
   SYSTEM_DICT_VERSION, USER_DICT_VERSION_2,
 };
 use sudachiclone::dictionary_lib::user_dictionary_builder::UserDictionaryBuilder;
-use sudachiclone::tokenizer::{CanTokenize, SplitMode};
+use sudachiclone::tokenizer::{CanTokenize, SplitMode, Tokenizer};
 
 // Subcommand names
 const TOKENIZE_SUB_CMD: &str = "tokenize";
@@ -53,42 +53,72 @@ fn unwrap<T, E: Error>(t: Result<T, E>) -> T {
   }
 }
 
-fn tokenize(args: &ArgMatches) {
-  if args.is_present(VERSION_ARG) {
-    print_version();
-    return;
-  }
-  let mode = match args.value_of(MODE_ARG) {
-    Some("A") => Some(SplitMode::A),
-    Some("B") => Some(SplitMode::B),
-    Some("C") => Some(SplitMode::C),
-    _ => None,
-  };
-  // todo(tmfink) hook up to fpath_out or stdout depending on args
-
-  let fpath_setting = args.value_of(FPATH_SETTING_ARG);
-  let python_exe = args.value_of_os(PYTHON_BIN_ARG);
-  let dictionary = unwrap(Dictionary::setup(fpath_setting, None, python_exe));
-  let tokenizer = dictionary.create();
-
+fn tokenize_loop<R: BufRead, W: Write>(
+  read_handle: &mut R,
+  write_handle: &mut W,
+  tokenizer: Tokenizer,
+  mode: Option<SplitMode>,
+  print_all: bool,
+) {
   let mut input = String::new();
-  let print_all = args.is_present(PRINT_ALL_ARG);
 
-  let stdin = std::io::stdin();
-  let mut handle = stdin.lock();
-
-  while let Ok(bytes_read) = handle.read_line(&mut input) {
+  while let Ok(bytes_read) = read_handle.read_line(&mut input) {
     if bytes_read == 0 {
       break;
     }
     for line in input.trim().split('\n') {
       if let Some(morpheme_list) = tokenizer.tokenize(line, mode, None) {
         for morpheme in morpheme_list {
-          println!("{}", morpheme.to_string(print_all).join("\t"));
+          let _ = writeln!(write_handle, "{}", morpheme.to_string(print_all).join("\t"));
         }
       }
     }
-    println!("EOS");
+    let _ = writeln!(write_handle, "EOS");
+  }
+}
+
+fn tokenize(args: &ArgMatches) {
+  if args.is_present(VERSION_ARG) {
+    print_version();
+    return;
+  }
+
+  let mode = match args.value_of(MODE_ARG) {
+    Some("A") => Some(SplitMode::A),
+    Some("B") => Some(SplitMode::B),
+    Some("C") => Some(SplitMode::C),
+    _ => None,
+  };
+
+  let fpath_setting = args.value_of(FPATH_SETTING_ARG);
+  let python_exe = args.value_of_os(PYTHON_BIN_ARG);
+  let print_all = args.is_present(PRINT_ALL_ARG);
+  let fpath_out = args.value_of(FPATH_OUT_ARG);
+
+  let dictionary = unwrap(Dictionary::setup(fpath_setting, None, python_exe));
+  let tokenizer = dictionary.create();
+
+  let stdin = std::io::stdin();
+  let mut read_handle = stdin.lock();
+
+  if let Some(fpath_out) = fpath_out {
+    let out_file = OpenOptions::new()
+      .create(true)
+      .write(true)
+      .truncate(true)
+      .open(fpath_out);
+    let mut out_file = unwrap(out_file);
+    tokenize_loop(&mut read_handle, &mut out_file, tokenizer, mode, print_all);
+  } else {
+    let stdout = std::io::stdout();
+    let mut write_handle = stdout.lock();
+    tokenize_loop(
+      &mut read_handle,
+      &mut write_handle,
+      tokenizer,
+      mode,
+      print_all,
+    );
   }
 }
 
@@ -245,7 +275,6 @@ fn main() {
         .possible_values(&["A", "B", "C"])
         .help("the mode of splitting"),
     )
-    // todo(Yasu-umi) FPATH_OUT_ARG is unused
     .arg(
       Arg::with_name(FPATH_OUT_ARG)
         .short("o")
