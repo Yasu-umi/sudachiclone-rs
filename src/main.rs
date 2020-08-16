@@ -32,6 +32,7 @@ const IN_FILES_ARG: &str = "in_files";
 const MATRIX_FILE_ARG: &str = "matrix_file";
 const MODE_ARG: &str = "mode";
 const OUT_FILE_ARG: &str = "out_file";
+const PYTHON_BIN_ARG: &str = "python_exe";
 const PRINT_ALL_ARG: &str = "print_all";
 const PRINT_DEBUG_ARG: &str = "print_debug";
 const SYSTEM_DIC_ARG: &str = "system_dic";
@@ -60,7 +61,9 @@ fn tokenize(args: &ArgMatches) {
   };
   // todo(tmfink) hook up to fpath_out or stdout depending on args
 
-  let dictionary = unwrap(Dictionary::setup(args.value_of(FPATH_SETTING_ARG), None));
+  let fpath_setting = args.value_of(FPATH_SETTING_ARG);
+  let python_exe = args.value_of_os(PYTHON_BIN_ARG);
+  let dictionary = unwrap(Dictionary::setup(fpath_setting, None, python_exe));
   let tokenizer = dictionary.create();
 
   let mut input = String::new();
@@ -79,8 +82,9 @@ fn tokenize(args: &ArgMatches) {
   }
 }
 
-fn link(_args: &ArgMatches) {
-  unwrap(create_default_link_for_sudachidict_core());
+fn link(args: &ArgMatches) {
+  let python_exe = args.value_of_os(PYTHON_BIN_ARG);
+  unwrap(create_default_link_for_sudachidict_core(python_exe));
 }
 
 fn build(args: &ArgMatches) {
@@ -103,8 +107,9 @@ fn ubuild(args: &ArgMatches) {
   let system_dic = if let Some(system_dic) = args.value_of(SYSTEM_DIC_ARG) {
     PathBuf::from(system_dic)
   } else {
+    let python_exe = args.value_of_os(PYTHON_BIN_ARG);
     let mut config = unwrap(Config::setup(None, None));
-    unwrap(config.system_dict_path())
+    unwrap(config.system_dict_path(python_exe))
   };
   if !system_dic.is_file() {
     eprintln!(
@@ -142,6 +147,18 @@ fn in_files_validator(in_file: String) -> Result<(), String> {
       in_file
     ))
   }
+}
+
+fn add_python_exe_arg<'a, 'b>(app: clap::App<'a, 'b>) -> clap::App<'a, 'b> {
+  app.arg(
+    Arg::with_name(PYTHON_BIN_ARG)
+      .short("p")
+      .takes_value(true)
+      .help("path to Python executable")
+      .long_help(
+        "path to Python executable (used to detect sudachi Python module install location)",
+      ),
+  )
 }
 
 fn main() {
@@ -191,6 +208,7 @@ fn main() {
         .help("text written in utf-8")
         .validator(in_files_validator),
     );
+  let tokenize_subcommand = add_python_exe_arg(tokenize_subcommand);
 
   let link_subcommand = SubCommand::with_name(LINK_SUB_CMD)
     .about("Link Default Dict Package")
@@ -203,6 +221,7 @@ fn main() {
         .default_value("core")
         .help("dict dict"),
     );
+  let link_subcommand = add_python_exe_arg(link_subcommand);
 
   let build_subcommand = SubCommand::with_name(BUILD_SUB_CMD)
     .about("Build Sudachi Dictionary")

@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::ffi::OsStr;
 use std::fs::{symlink_metadata, File};
 use std::io::{BufReader, Error as IOError, ErrorKind as IOErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
@@ -6,6 +7,7 @@ use std::process::{Child, Command, Stdio};
 use std::str::FromStr;
 use std::string::FromUtf8Error;
 
+use log::{debug, error, info};
 use serde_json::{error::Error as SerdeError, Value};
 #[cfg(any(target_os = "redox", unix, windows))]
 use symlink::{remove_symlink_dir, symlink_dir};
@@ -100,14 +102,17 @@ impl Config {
     Ok(config)
   }
 
-  pub fn system_dict_path(&mut self) -> Result<PathBuf, SudachiDictErr> {
+  pub fn system_dict_path(
+    &mut self,
+    python_exe: Option<&OsStr>,
+  ) -> Result<PathBuf, SudachiDictErr> {
     if let Some(Value::String(p)) = self.settings.get("systemDict") {
       let path = self.resource_dir.join(p);
       if path.exists() {
         return Ok(path);
       }
     }
-    let dict_path = get_sudachi_dict_path()?;
+    let dict_path = get_sudachi_dict_path(python_exe)?;
     self.settings.as_object_mut().unwrap().insert(
       String::from("systemDict"),
       Value::String(dict_path.to_str().unwrap().to_string()),
@@ -158,8 +163,15 @@ pub enum SudachiDictErr {
   UnlinkFaildErr,
 }
 
-/// Spawn child process that will try to print the path of a Python module
-fn get_python_package_path_cmd(pkg_name: &str) -> Result<Child, IOError> {
+fn get_python_package_path_cmd_python(
+  python_exe: &OsStr,
+  pkg_name: &str,
+) -> Result<Child, IOError> {
+  debug!(
+    "Searching for Python package {pkg_name} with Python {python_exe:?}",
+    python_exe = python_exe,
+    pkg_name = pkg_name
+  );
   // todo(tmfink): make compatible with python 2 and 3
   let cmd = format!(
     r#"
@@ -170,7 +182,7 @@ exit()
 "#,
     pkg_name
   );
-  let mut child = Command::new("python")
+  let mut child = Command::new(python_exe)
     .stdin(Stdio::piped())
     .stderr(Stdio::piped())
     .stdout(Stdio::piped())
@@ -179,8 +191,28 @@ exit()
   Ok(child)
 }
 
-fn success_import(pkg_name: &str) -> bool {
-  match get_python_package_path_cmd(pkg_name) {
+/// Spawn child process that will try to print the path of a Python module
+fn get_python_package_path_cmd(
+  python_exe: Option<&OsStr>,
+  pkg_name: &str,
+) -> Result<Child, IOError> {
+  if let Some(python_exe) = python_exe {
+    return get_python_package_path_cmd_python(python_exe, pkg_name);
+  }
+
+  // No python specified; try these in order
+  const TRY_PYTHON_NAMES: &[&str] = &["python3", "python", "python2"];
+  for python_exe in TRY_PYTHON_NAMES.into_iter() {
+    if let Ok(child) = get_python_package_path_cmd_python(python_exe.as_ref(), pkg_name) {
+      return Ok(child);
+    }
+  }
+  error!("Unable to find valid python installation");
+  Err(IOError::new(IOErrorKind::NotFound, ""))
+}
+
+fn success_import(python_exe: Option<&OsStr>, pkg_name: &str) -> bool {
+  match get_python_package_path_cmd(python_exe, pkg_name) {
     Ok(cmd) => {
       let output = cmd.wait_with_output();
       match output {
@@ -192,8 +224,8 @@ fn success_import(pkg_name: &str) -> bool {
   }
 }
 
-fn unlink_default_dict_package() -> Result<(), SudachiDictErr> {
-  if let Some(dst_path) = get_python_package_path_cmd(SUDACHIDICT_PKG_NAME)?
+fn unlink_default_dict_package(python_exe: Option<&OsStr>) -> Result<(), SudachiDictErr> {
+  if let Some(dst_path) = get_python_package_path_cmd(python_exe, SUDACHIDICT_PKG_NAME)?
     .wait_with_output()
     .map(|o| String::from_utf8(o.stdout).ok())
     .ok()
@@ -214,10 +246,13 @@ fn unlink_default_dict_package() -> Result<(), SudachiDictErr> {
   Ok(())
 }
 
-fn set_default_dict_package(dict_pkg_name: &str) -> Result<String, SudachiDictErr> {
-  unlink_default_dict_package()?;
+fn set_default_dict_package(
+  python_exe: Option<&OsStr>,
+  dict_pkg_name: &str,
+) -> Result<String, SudachiDictErr> {
+  unlink_default_dict_package(python_exe)?;
   let src_path = String::from_utf8(
-    get_python_package_path_cmd(dict_pkg_name)?
+    get_python_package_path_cmd(python_exe, dict_pkg_name)?
       .wait_with_output()?
       .stdout,
   )?;
@@ -228,8 +263,8 @@ fn set_default_dict_package(dict_pkg_name: &str) -> Result<String, SudachiDictEr
   Ok(dst_path.to_str().unwrap().to_string())
 }
 
-fn get_sudachi_py_package_path() -> Result<String, SudachiDictErr> {
-  let output = get_python_package_path_cmd(SUDACHIDICT_PKG_NAME)?.wait_with_output()?;
+fn get_sudachi_py_package_path(python_exe: Option<&OsStr>) -> Result<String, SudachiDictErr> {
+  let output = get_python_package_path_cmd(python_exe, SUDACHIDICT_PKG_NAME)?.wait_with_output()?;
   if output.status.success() {
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
   } else {
@@ -237,23 +272,26 @@ fn get_sudachi_py_package_path() -> Result<String, SudachiDictErr> {
   }
 }
 
-pub fn create_default_link_for_sudachidict_core() -> Result<(), SudachiDictErr> {
-  get_sudachi_dict_path()?;
-  if !success_import(SUDACHIDICT_CORE_PKG_NAME) {
+pub fn create_default_link_for_sudachidict_core(
+  python_exe: Option<&OsStr>,
+) -> Result<(), SudachiDictErr> {
+  get_sudachi_dict_path(python_exe)?;
+  if !success_import(python_exe, SUDACHIDICT_CORE_PKG_NAME) {
     return Err(SudachiDictErr::NotFoundSudachiDictCoreErr);
   }
-  if success_import(SUDACHIDICT_FULL_PKG_NAME) {
+  if success_import(python_exe, SUDACHIDICT_FULL_PKG_NAME) {
     return Err(SudachiDictErr::SetDefaultDictErr);
   }
-  if success_import(SUDACHIDICT_SMALL_PKG_NAME) {
+  if success_import(python_exe, SUDACHIDICT_SMALL_PKG_NAME) {
     return Err(SudachiDictErr::SetDefaultDictErr);
   }
 
-  set_default_dict_package(SUDACHIDICT_CORE_PKG_NAME)?;
+  set_default_dict_package(python_exe, SUDACHIDICT_CORE_PKG_NAME)?;
   Ok(())
 }
 
-fn get_sudachi_dict_path() -> Result<PathBuf, SudachiDictErr> {
-  let package_path = get_sudachi_py_package_path()?;
+fn get_sudachi_dict_path(python_exe: Option<&OsStr>) -> Result<PathBuf, SudachiDictErr> {
+  info!("Getting sudachi dictionary path");
+  let package_path = get_sudachi_py_package_path(python_exe)?;
   Ok(PathBuf::from_str(&package_path)?.join("resources/system.dic"))
 }

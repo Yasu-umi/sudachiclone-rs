@@ -250,6 +250,7 @@ mod tests {
     Dictionary::setup(
       Some(config_path.to_str().unwrap()),
       Some(resource_dir.to_str().unwrap()),
+      None,
     )
     .unwrap()
   }

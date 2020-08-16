@@ -1,7 +1,7 @@
 //! ```
 //! use sudachiclone::prelude::*;
 //!
-//! let dictionary = Dictionary::setup(None, None).unwrap();
+//! let dictionary = Dictionary::setup(None, None, None).unwrap();
 //! let tokenizer = dictionary.create();
 //!
 //! // Multi-granular tokenization

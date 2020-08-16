@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::io::Error as IOError;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -72,9 +73,11 @@ impl Dictionary {
   pub fn setup(
     config_path: Option<&str>,
     resource_dir: Option<&str>,
+    python_exe: Option<&OsStr>,
   ) -> Result<Dictionary, DictionaryErr> {
     let mut config = Config::setup(config_path, resource_dir)?;
-    let mut system_dictionary = Dictionary::read_system_dictionary(config.system_dict_path()?)?;
+    let mut system_dictionary =
+      Dictionary::read_system_dictionary(config.system_dict_path(python_exe)?)?;
 
     let char_category = Dictionary::read_character_definition(config.char_def_path()?)?;
     system_dictionary
