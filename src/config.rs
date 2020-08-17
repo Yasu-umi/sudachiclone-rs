@@ -172,12 +172,13 @@ fn get_python_package_path_helper(python_exe: &OsStr, pkg_name: &str) -> Result<
     python_exe = python_exe,
     pkg_name = pkg_name
   );
-  // todo(tmfink): make compatible with python 2 and 3
+
+  // Support both Python 2 and 3
   let cmd = format!(
     r#"
 from importlib import import_module
-from pathlib import Path
-print(Path(import_module("{}").__file__).parent)
+from os.path import dirname
+print(dirname(import_module("{}").__file__))
 exit()
 "#,
     pkg_name
