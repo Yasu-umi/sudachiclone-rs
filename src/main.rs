@@ -298,8 +298,7 @@ fn main() {
         .help("text written in utf-8")
         .validator(in_files_validator),
     )
-    .add_python_exe_arg()
-    .add_log_args();
+    .add_python_exe_arg();
 
   let link_subcommand = SubCommand::with_name(LINK_SUB_CMD)
     .about("Link Default Dict Package")
@@ -312,8 +311,7 @@ fn main() {
         .default_value("core")
         .help("dict dict"),
     )
-    .add_python_exe_arg()
-    .add_log_args();
+    .add_python_exe_arg();
 
   let build_subcommand = SubCommand::with_name(BUILD_SUB_CMD)
     .about("Build Sudachi Dictionary")
@@ -353,8 +351,7 @@ fn main() {
       Arg::with_name(IN_FILES_ARG)
         .takes_value(true)
         .help("source files with CSV format (one of more)"),
-    )
-    .add_log_args();
+    );
 
   let ubuild_subcommand = SubCommand::with_name(UBUILD_SUB_CMD)
     .about("Build User Dictionary")
@@ -383,8 +380,7 @@ fn main() {
       Arg::with_name(IN_FILES_ARG)
         .takes_value(true)
         .help("source files with CSV format (one of more)"),
-    )
-    .add_log_args();
+    );
 
   let mut app = App::new("Japanese Morphological Analyzer")
     .subcommand(tokenize_subcommand)
