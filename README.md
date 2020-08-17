@@ -41,11 +41,16 @@ $ sudachiclone -h
 Japanese Morphological Analyzer
 
 USAGE:
-    sudachiclone [SUBCOMMAND]
+    sudachiclone [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information
+    -q               Silence all output
     -V, --version    Prints version information
+    -v               Increase message verbosity
+
+OPTIONS:
+    -z <timestamp>        prepend timestamp to log lines [possible values: none, sec, ms, ns]
 
 SUBCOMMANDS:
     build       Build Sudachi Dictionary
@@ -57,7 +62,7 @@ SUBCOMMANDS:
 
 ```bash
 $ sudachiclone tokenize -h
-sudachiclone-tokenize
+sudachiclone-tokenize 0.2.1
 Tokenize Text
 
 USAGE:
@@ -66,14 +71,13 @@ USAGE:
 FLAGS:
     -h, --help       (default) see `tokenize -h`
     -a               print all of the fields
-    -d               print the debug information
     -V, --version    Prints version information
-    -v               print sudachipy version
 
 OPTIONS:
     -o <fpath_out>            the output file
     -r <fpath_setting>        the setting file in JSON format
     -m <mode>                 the mode of splitting [possible values: A, B, C]
+    -p <python_exe>           path to Python executable
 
 ARGS:
     <in_files>...    text written in utf-8
@@ -92,8 +96,8 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -t <dict_type>        dict dict [default: core]  [possible values: small, core, full]
-```
+    -t <dict_type>         dict dict [default: core]  [possible values: small, core, full]
+    -p <python_exe>        path to Python executable```
 
 ```bash
 $ sudachiclone build -h
@@ -123,53 +127,53 @@ Here is an example usage:
 ```rust
 use sudachiclone::prelude::*;
 
-let dictionary = Dictionary::new(None, None).unwrap();
+let dictionary = Dictionary::setup(None, None, None).unwrap();
 let tokenizer = dictionary.create();
 
 // Multi-granular tokenization
 // using `system_core.dic` or `system_full.dic` version 20190781
 // you may not be able to replicate this particular example due to dictionary you use
 
-for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::C), None).unwrap() {
+for m in tokenizer.tokenize("国家公務員", Some(SplitMode::C), None).unwrap() {
     println!("{}", m.surface());
 };
-# => 国家公務員
+// => 国家公務員
 
-for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::B), None).unwrap() {
+for m in tokenizer.tokenize("国家公務員", Some(SplitMode::B), None).unwrap() {
     println!("{}", m.surface());
 };
-# => 国家
-# => 公務員
+// => 国家
+// => 公務員
 
-for m in tokenizer.tokenize("国家公務員", &Some(SplitMode::A), None).unwrap() {
+for m in tokenizer.tokenize("国家公務員", Some(SplitMode::A), None).unwrap() {
     println!("{}", m.surface());
 };
-# => 国家
-# => 公務
-# => 員
+// => 国家
+// => 公務
+// => 員
 
 // Morpheme information
 
-let m = tokenizer.tokenize("食べ", &Some(SplitMode::A), None).unwrap().get(0).unwrap();
+let m = tokenizer.tokenize("食べ", Some(SplitMode::A), None).unwrap().get(0).unwrap();
 println!("{}", m.surface());
-# => 食べ
+// => 食べ
 println!("{}", m.dictionary_form());
-# => 食べる
+// => 食べる
 println!("{}", m.reading_form());
-# => タベ
+// => タベ
 println!("{:?}", m.part_of_speech());
-# => ["動詞", "一般", "*", "*", "下一段-バ行", "連用形-一般"]
+// => ["動詞", "一般", "*", "*", "下一段-バ行", "連用形-一般"]
 
 // Normalization
 
-println!("{}", tokenizer.tokenize("附属", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
-# => 付属
+println!("{}", tokenizer.tokenize("附属", Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
+// => 付属
 
-println!("{}", tokenizer.tokenize("SUMMER", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
-# => サマー
+println!("{}", tokenizer.tokenize("SUMMER", Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
+// => サマー
 
-println!("{}", tokenizer.tokenize("シュミレーション", &Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
-# => シミュレーション
+println!("{}", tokenizer.tokenize("シュミレーション", Some(SplitMode::A), None).unwrap().get(0).unwrap().normalized_form());
+// => シミュレーション
 ```
 
 ## License
