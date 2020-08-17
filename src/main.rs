@@ -41,7 +41,6 @@ const QUIET_ARG: &str = "quiet";
 const PRINT_ALL_ARG: &str = "print_all";
 const SYSTEM_DIC_ARG: &str = "system_dic";
 const VERBOSE_ARG: &str = "verbose";
-const VERSION_ARG: &str = "version";
 
 fn unwrap<T, E: Error>(t: Result<T, E>) -> T {
   match t {
@@ -78,11 +77,6 @@ fn tokenize_loop<R: BufRead, W: Write>(
 }
 
 fn tokenize(args: &ArgMatches) {
-  if args.is_present(VERSION_ARG) {
-    print_version();
-    return;
-  }
-
   let mode = match args.value_of(MODE_ARG) {
     Some("A") => Some(SplitMode::A),
     Some("B") => Some(SplitMode::B),
@@ -173,10 +167,6 @@ fn ubuild(args: &ArgMatches) {
   unwrap(builder.build(&lexicon_paths, &mut writer));
 }
 
-fn print_version() {
-  println!("sudachi {}", crate_version!())
-}
-
 fn in_files_validator(in_file: String) -> Result<(), String> {
   if Path::new(&in_file).is_file() {
     Ok(())
@@ -259,6 +249,7 @@ fn setup_logging(matches: &clap::ArgMatches) {
 }
 
 fn main() {
+  let version_string = format!("{}", crate_version!());
   let tokenize_subcommand = SubCommand::with_name(TOKENIZE_SUB_CMD)
     .about("Tokenize Text")
     .help_message("(default) see `tokenize -h`")
@@ -287,17 +278,13 @@ fn main() {
         .help("print all of the fields"),
     )
     .arg(
-      Arg::with_name(VERSION_ARG)
-        .short("V")
-        .help("print sudachipy version"),
-    )
-    .arg(
       Arg::with_name(IN_FILES_ARG)
         .takes_value(true)
         .multiple(true)
         .help("text written in utf-8")
         .validator(in_files_validator),
     )
+    .version(version_string.as_str())
     .add_python_exe_arg();
 
   let link_subcommand = SubCommand::with_name(LINK_SUB_CMD)
