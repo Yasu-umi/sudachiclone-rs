@@ -78,7 +78,7 @@ impl Config {
 
   pub fn setup(path: Option<&str>, resource_dir: Option<&str>) -> Result<Config, ConfigErr> {
     let mut config = Config::empty()?;
-    let default_setting_file = config.DEFAULT_SETTINGFILE.to_path_buf();
+    let default_setting_file = &config.DEFAULT_SETTINGFILE;
     if path.is_none() {
       resources::write_sudachi_json(&default_setting_file)?;
     }
@@ -214,7 +214,7 @@ fn get_python_package_path(
 
   // No python specified; try these in order
   const TRY_PYTHON_NAMES: &[&str] = &["python3", "python", "python2"];
-  for python_exe in TRY_PYTHON_NAMES.into_iter() {
+  for python_exe in TRY_PYTHON_NAMES.iter() {
     if let Ok(child) = get_python_package_path_helper(python_exe.as_ref(), pkg_name) {
       return Ok(child);
     }

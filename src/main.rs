@@ -7,7 +7,6 @@ use std::str::FromStr;
 
 use clap::{crate_name, crate_version, App, Arg, ArgMatches, SubCommand};
 use log::info;
-use stderrlog;
 
 use sudachiclone::config::{create_default_link_for_sudachidict_core, Config};
 use sudachiclone::dictionary::Dictionary;
@@ -249,7 +248,6 @@ fn setup_logging(matches: &clap::ArgMatches) {
 }
 
 fn main() {
-  let version_string = format!("{}", crate_version!());
   let tokenize_subcommand = SubCommand::with_name(TOKENIZE_SUB_CMD)
     .about("Tokenize Text")
     .help_message("(default) see `tokenize -h`")
@@ -284,7 +282,7 @@ fn main() {
         .help("text written in utf-8")
         .validator(in_files_validator),
     )
-    .version(version_string.as_str())
+    .version(crate_version!())
     .add_python_exe_arg();
 
   let link_subcommand = SubCommand::with_name(LINK_SUB_CMD)
