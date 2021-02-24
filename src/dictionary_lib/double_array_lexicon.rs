@@ -113,7 +113,7 @@ impl DoubleArrayLexicon {
         continue;
       }
       let surface = self.get_word_info(word_id).surface;
-      let ms = tokenizer.tokenize(&surface, &None, None);
+      let ms = tokenizer.tokenize(&surface, None, None);
       if let Some(ms) = ms {
         let mut cost = ms.get_internal_cost() + USER_DICT_COST_PER_MORPH * ms.len() as i16;
         cost = min(cost, SIGNED_SHORT_MAX);

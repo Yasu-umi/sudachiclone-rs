@@ -4,7 +4,6 @@ use std::io::{BufRead, Cursor, Error as IOError, Seek, SeekFrom, Write};
 use std::num::ParseIntError;
 use std::str::FromStr;
 
-use csv;
 use log::{error, info, warn};
 use regex::{Captures, Error as RegexError, Regex};
 use thiserror::Error;

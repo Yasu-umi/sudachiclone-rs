@@ -15,19 +15,29 @@ use super::plugin::path_rewrite_plugin::{PathRewritePlugin, RewritePath};
 use super::utf8_input_text::{InputText, UTF8InputText};
 use super::utf8_input_text_builder::UTF8InputTextBuilder;
 
+/// Able to tokenize Japanese text
 pub trait CanTokenize {
   fn tokenize<T: AsRef<str>>(
     &self,
     text: T,
-    mode: &Option<SplitMode>,
+    mode: Option<SplitMode>,
     logger: Option<Box<dyn Log>>,
   ) -> Option<MorphemeList>;
 }
 
-#[derive(PartialEq)]
+/// How to split text
+///
+/// For moree details, see the
+/// [sudachi documentation](https://github.com/WorksApplications/sudachi#the-modes-of-splitting)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SplitMode {
+  /// Divide into the shortest units equivalent to the UniDic short unit
   A,
+
+  /// Extract middle units
   B,
+
+  /// Extract named entities
   C,
 }
 
@@ -104,14 +114,14 @@ impl Tokenizer {
   fn split_path(
     &self,
     path: Vec<Arc<Mutex<LatticeNode>>>,
-    mode: &SplitMode,
+    mode: SplitMode,
   ) -> Vec<Arc<Mutex<LatticeNode>>> {
-    if mode == &SplitMode::C {
+    if mode == SplitMode::C {
       return path;
     }
     let mut new_path = vec![];
     for node in path {
-      let word_ids = if mode == &SplitMode::A {
+      let word_ids = if mode == SplitMode::A {
         node.lock().unwrap().get_word_info().a_unit_split
       } else {
         node.lock().unwrap().get_word_info().b_unit_split
@@ -143,7 +153,7 @@ impl<'a, C: CanTokenize + ?Sized> CanTokenize for &'a C {
   fn tokenize<T: AsRef<str>>(
     &self,
     text: T,
-    mode: &Option<SplitMode>,
+    mode: Option<SplitMode>,
     logger: Option<Box<dyn Log>>,
   ) -> Option<MorphemeList> {
     (**self).tokenize(text, mode, logger)
@@ -154,7 +164,7 @@ impl CanTokenize for Tokenizer {
   fn tokenize<T: AsRef<str>>(
     &self,
     text: T,
-    mode: &Option<SplitMode>,
+    mode: Option<SplitMode>,
     logger: Option<Box<dyn Log>>,
   ) -> Option<MorphemeList> {
     if text.as_ref().is_empty() {
@@ -164,7 +174,7 @@ impl CanTokenize for Tokenizer {
       set_boxed_logger(logger).unwrap();
     }
 
-    let mode = mode.as_ref().unwrap_or(&SplitMode::C);
+    let mode = mode.unwrap_or(SplitMode::C);
     let mut builder = UTF8InputTextBuilder::new(text.as_ref(), Arc::clone(&self.grammar));
     for plugin in self.input_text_plugins.iter() {
       if plugin.rewrite(&mut builder).is_err() {
@@ -240,6 +250,7 @@ mod tests {
     Dictionary::setup(
       Some(config_path.to_str().unwrap()),
       Some(resource_dir.to_str().unwrap()),
+      None,
     )
     .unwrap()
   }
@@ -253,14 +264,14 @@ mod tests {
   #[test]
   fn test_tokenize_small_katanana_only() {
     let (_, tokenizer) = &build_tokenizer();
-    let morpheme_list = tokenizer.tokenize("ァ", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("ァ", None, None).unwrap();
     assert_eq!(1, morpheme_list.len());
   }
 
   #[test]
   fn test_part_of_speech() {
     let (dictionary, tokenizer) = &build_tokenizer();
-    let morpheme_list = tokenizer.tokenize("京都", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("京都", None, None).unwrap();
     assert_eq!(1, morpheme_list.len());
     let pid = morpheme_list.get(0).unwrap().part_of_speech_id() as usize;
     assert!(
@@ -284,7 +295,7 @@ mod tests {
   #[test]
   fn test_get_word_id() {
     let (_, tokenizer) = &build_tokenizer();
-    let morpheme_list = tokenizer.tokenize("京都", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("京都", None, None).unwrap();
     let morpheme = morpheme_list.get(0).unwrap();
     assert_eq!(1, morpheme_list.len());
     assert_eq!(
@@ -300,7 +311,7 @@ mod tests {
     );
 
     let word_id = &morpheme.get_word_id();
-    let morpheme_list = tokenizer.tokenize("ぴらる", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("ぴらる", None, None).unwrap();
     let morpheme = morpheme_list.get(0).unwrap();
     assert_eq!(1, morpheme_list.len());
     assert!(word_id != &morpheme.get_word_id());
@@ -316,22 +327,22 @@ mod tests {
       morpheme.part_of_speech()
     );
 
-    let morpheme_list = tokenizer.tokenize("京", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("京", None, None).unwrap();
     assert_eq!(1, morpheme_list.len());
   }
 
   #[test]
   fn test_get_dictionary_id() {
     let (_, tokenizer) = &build_tokenizer();
-    let morpheme_list = tokenizer.tokenize("京都", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("京都", None, None).unwrap();
     let morpheme = morpheme_list.get(0).unwrap();
     assert_eq!(Some(0), morpheme.dictionary_id());
 
-    let morpheme_list = tokenizer.tokenize("ぴらる", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("ぴらる", None, None).unwrap();
     let morpheme = morpheme_list.get(0).unwrap();
     assert_eq!(Some(1), morpheme.dictionary_id());
 
-    let morpheme_list = tokenizer.tokenize("京", &None, None).unwrap();
+    let morpheme_list = tokenizer.tokenize("京", None, None).unwrap();
     let morpheme = morpheme_list.get(0).unwrap();
     assert_eq!(None, morpheme.dictionary_id());
   }
@@ -339,16 +350,16 @@ mod tests {
   #[test]
   fn test_tokenize_kanji_alphabet_word() {
     let (_, tokenizer) = &build_tokenizer();
-    assert_eq!(1, tokenizer.tokenize("特a", &None, None).unwrap().len());
-    assert_eq!(1, tokenizer.tokenize("ab", &None, None).unwrap().len());
-    assert_eq!(2, tokenizer.tokenize("特ab", &None, None).unwrap().len());
+    assert_eq!(1, tokenizer.tokenize("特a", None, None).unwrap().len());
+    assert_eq!(1, tokenizer.tokenize("ab", None, None).unwrap().len());
+    assert_eq!(2, tokenizer.tokenize("特ab", None, None).unwrap().len());
   }
 
   #[test]
   fn test_tokenize_multiline_sentences() {
     let (_, tokenizer) = &build_tokenizer();
     let ms = tokenizer
-      .tokenize("我輩は猫である。\n名前はまだない。", &None, None)
+      .tokenize("我輩は猫である。\n名前はまだない。", None, None)
       .unwrap();
     assert_eq!(17, ms.len());
     assert_eq!(
