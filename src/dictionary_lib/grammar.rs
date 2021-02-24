@@ -43,13 +43,7 @@ impl Grammar {
     } else {
       let mut buf = vec![0i16; left_id_size * right_id_size];
       reader.read_i16_into::<LittleEndian>(&mut buf)?;
-      let mut matrix_view = vec![vec![0; right_id_size]; left_id_size];
-      for i in 0..left_id_size {
-        for j in 0..right_id_size {
-          matrix_view[i][j] = buf[(i * left_id_size) + j];
-        }
-      }
-      matrix_view
+      buf.chunks(right_id_size).map(|chunk| chunk.to_vec()).collect()
     };
 
     Ok(Grammar {
