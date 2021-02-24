@@ -79,7 +79,7 @@ impl DictionaryHeader {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::dictionary_lib::system_dictionary_version::SYSTEM_DICT_VERSION;
+  use crate::dictionary_lib::system_dictionary_version::SYSTEM_DICT_VERSION_1;
   use std::fs::File;
   use std::io::BufReader;
   use std::path::PathBuf;
@@ -105,7 +105,7 @@ mod tests {
   #[test]
   fn test_version() {
     let header = read_header();
-    assert_eq!(header.version, SYSTEM_DICT_VERSION);
+    assert_eq!(header.version, SYSTEM_DICT_VERSION_1);
   }
 
   #[test]

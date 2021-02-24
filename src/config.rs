@@ -13,7 +13,7 @@ use serde_json::{error::Error as SerdeError, Value};
 use symlink::{remove_symlink_dir, symlink_dir};
 use thiserror::Error;
 
-const SUDACHIDICT_PKG_NAME: &str = "sudachidict";
+const SUDACHIDICT_PKG_NAME: &str = "sudachidict_core";
 const SUDACHIDICT_CORE_PKG_NAME: &str = "sudachidict_core";
 const SUDACHIDICT_FULL_PKG_NAME: &str = "sudachidict_full";
 const SUDACHIDICT_SMALL_PKG_NAME: &str = "sudachidict_small";

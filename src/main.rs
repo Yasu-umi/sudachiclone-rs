@@ -14,7 +14,7 @@ use sudachiclone::dictionary_lib::binary_dictionary::BinaryDictionary;
 use sudachiclone::dictionary_lib::dictionary_builder::DictionaryBuilder;
 use sudachiclone::dictionary_lib::dictionary_header::DictionaryHeader;
 use sudachiclone::dictionary_lib::system_dictionary_version::{
-  SYSTEM_DICT_VERSION, USER_DICT_VERSION_2,
+  SYSTEM_DICT_VERSION_1, USER_DICT_VERSION_2,
 };
 use sudachiclone::dictionary_lib::user_dictionary_builder::UserDictionaryBuilder;
 use sudachiclone::tokenizer::{CanTokenize, SplitMode, Tokenizer};
@@ -123,7 +123,7 @@ fn link(args: &ArgMatches) {
 fn build(args: &ArgMatches) {
   let description = args.value_of(DESCRIPTION_ARG).unwrap().to_string();
   let header = DictionaryHeader::new(
-    SYSTEM_DICT_VERSION,
+    SYSTEM_DICT_VERSION_1,
     DictionaryHeader::get_time(),
     description,
   );

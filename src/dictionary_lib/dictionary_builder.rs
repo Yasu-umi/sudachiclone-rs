@@ -648,7 +648,7 @@ mod tests {
   #[cfg(not(target_arch = "wasm32"))]
   use crate::dictionary_lib::lexicon_set::LexiconSet;
   #[cfg(not(target_arch = "wasm32"))]
-  use crate::dictionary_lib::system_dictionary_version::SYSTEM_DICT_VERSION;
+  use crate::dictionary_lib::system_dictionary_version::SYSTEM_DICT_VERSION_1;
 
   use encoding_rs::UTF_16LE;
 
@@ -974,7 +974,7 @@ mod tests {
     let mut stream = Cursor::new(vec![]);
     let mut matrix_reader = Cursor::new(b"1 1\n0 0 200\n");
     let header = DictionaryHeader::new(
-      SYSTEM_DICT_VERSION,
+      SYSTEM_DICT_VERSION_1,
       DictionaryHeader::get_time(),
       String::from("test"),
     );
@@ -993,7 +993,7 @@ mod tests {
     let lexicon = &lexicon_set.first();
 
     // header
-    assert_eq!(SYSTEM_DICT_VERSION, header.version);
+    assert_eq!(SYSTEM_DICT_VERSION_1, header.version);
     assert_eq!("test", header.description);
 
     // grammar
