@@ -9,7 +9,8 @@ use super::double_array_lexicon::DoubleArrayLexicon;
 use super::grammar::Grammar;
 use super::lexicon::LexiconErr;
 use super::system_dictionary_version::{
-  SYSTEM_DICT_VERSION_1, SYSTEM_DICT_VERSION_2, USER_DICT_VERSION_1, USER_DICT_VERSION_2, USER_DICT_VERSION_3
+  SYSTEM_DICT_VERSION_1, SYSTEM_DICT_VERSION_2, USER_DICT_VERSION_1, USER_DICT_VERSION_2,
+  USER_DICT_VERSION_3,
 };
 
 #[derive(Error, Debug)]
@@ -74,7 +75,9 @@ impl BinaryDictionary {
   ) -> Result<BinaryDictionary, ReadDictionaryErr> {
     let mut reader = BufReader::new(File::open(filename)?);
     let dictionary = BinaryDictionary::read_dictionary_from_reader(&mut reader)?;
-    if dictionary.header.version != SYSTEM_DICT_VERSION_1 && dictionary.header.version != SYSTEM_DICT_VERSION_2 {
+    if dictionary.header.version != SYSTEM_DICT_VERSION_1
+      && dictionary.header.version != SYSTEM_DICT_VERSION_2
+    {
       return Err(ReadDictionaryErr::InvalidSystemDictionaryErr);
     }
     Ok(dictionary)

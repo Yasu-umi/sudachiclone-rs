@@ -43,7 +43,10 @@ impl Grammar {
     } else {
       let mut buf = vec![0i16; left_id_size * right_id_size];
       reader.read_i16_into::<LittleEndian>(&mut buf)?;
-      buf.chunks(right_id_size).map(|chunk| chunk.to_vec()).collect()
+      buf
+        .chunks(right_id_size)
+        .map(|chunk| chunk.to_vec())
+        .collect()
     };
 
     Ok(Grammar {

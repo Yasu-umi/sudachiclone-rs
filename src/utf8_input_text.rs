@@ -82,10 +82,14 @@ impl Utf8InputText {
 impl InputText for Utf8InputText {
   fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, InputTextErr> {
     if end > self.bytes.len() {
-      return Err(InputTextErr::FailedSubstringErr(String::from("end > self.bytes.len()")));
+      return Err(InputTextErr::FailedSubstringErr(String::from(
+        "end > self.bytes.len()",
+      )));
     }
     if start > end {
-      return Err(InputTextErr::FailedSubstringErr(String::from("start > end")));
+      return Err(InputTextErr::FailedSubstringErr(String::from(
+        "start > end",
+      )));
     }
     Ok(Cow::Borrowed(self.modified_text.get(start..end).unwrap()))
   }
