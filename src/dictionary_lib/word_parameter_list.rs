@@ -1,4 +1,4 @@
-use std::io::{BufRead, Error as IOError};
+use std::io::{BufRead, Error as IoError};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -11,7 +11,7 @@ pub struct WordParameterList {
 const ELEMENT_SIZE_AS_SHORT: usize = 3;
 
 impl WordParameterList {
-  pub fn from_reader<R: BufRead>(reader: &mut R) -> Result<WordParameterList, IOError> {
+  pub fn from_reader<R: BufRead>(reader: &mut R) -> Result<WordParameterList, IoError> {
     let size = reader.read_u32::<LittleEndian>()? as usize;
     let mut array_view = vec![0i16; ELEMENT_SIZE_AS_SHORT * size];
     reader.read_i16_into::<LittleEndian>(&mut array_view)?;

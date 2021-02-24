@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 use super::dictionary_lib::grammar::Grammar;
 use super::dictionary_lib::word_info::WordInfo;
 use super::lattice_node::LatticeNode;
-use super::utf8_input_text::UTF8InputText;
+use super::utf8_input_text::Utf8InputText;
 
 pub struct Morpheme {
-  input_text: Arc<Mutex<UTF8InputText>>,
+  input_text: Arc<Mutex<Utf8InputText>>,
   word_info: WordInfo,
   grammar: Arc<Mutex<Grammar>>,
   node: Arc<Mutex<LatticeNode>>,
@@ -15,7 +15,7 @@ pub struct Morpheme {
 
 impl Morpheme {
   pub fn new(
-    input_text: Arc<Mutex<UTF8InputText>>,
+    input_text: Arc<Mutex<Utf8InputText>>,
     word_info: WordInfo,
     grammar: Arc<Mutex<Grammar>>,
     node: Arc<Mutex<LatticeNode>>,

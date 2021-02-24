@@ -1,4 +1,4 @@
-use std::io::{BufRead, Error as IOError, Seek, SeekFrom};
+use std::io::{BufRead, Error as IoError, Seek, SeekFrom};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use encoding_rs::UTF_16LE;
@@ -19,7 +19,7 @@ pub struct Grammar {
 }
 
 impl Grammar {
-  pub fn from_reader<R: Seek + BufRead>(reader: &mut R) -> Result<Grammar, IOError> {
+  pub fn from_reader<R: Seek + BufRead>(reader: &mut R) -> Result<Grammar, IoError> {
     let offset = reader.seek(SeekFrom::Current(0))? as usize;
     let pos_size = reader.read_i16::<LittleEndian>()? as usize;
     let mut pos_list = vec![Vec::with_capacity(6); pos_size];

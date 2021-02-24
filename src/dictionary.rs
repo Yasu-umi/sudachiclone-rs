@@ -1,5 +1,5 @@
 use std::ffi::OsStr;
-use std::io::Error as IOError;
+use std::io::Error as IoError;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -24,7 +24,7 @@ pub enum DictionaryErr {
   #[error("too many dictionaries")]
   TooManyDictionariesErr,
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("{0}")]
   ConfigErr(#[from] ConfigErr),
   #[error("{0}")]

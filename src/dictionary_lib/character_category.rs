@@ -1,7 +1,7 @@
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashSet};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Error as IOError};
+use std::io::{BufRead, BufReader, Error as IoError};
 use std::num::ParseIntError;
 use std::path::Path;
 use std::str::FromStr;
@@ -56,7 +56,7 @@ pub enum ReadCharacterDefinitionErr {
   #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
 }
 
 impl CharacterCategoryRange {
@@ -99,7 +99,7 @@ impl CharacterCategory {
       pivot = new_pivot;
     }
     let mut set = HashSet::new();
-    set.insert(CategoryType::DEFAULT);
+    set.insert(CategoryType::Default);
     set
   }
   fn compile(&mut self) {
@@ -163,6 +163,7 @@ impl CharacterCategory {
     self.range_list = vec![];
     let mut range = new_range_list.remove(0);
     for irange in new_range_list {
+      #[allow(clippy::suspicious_operation_groupings)]
       if irange.low == range.high && irange.categories == range.categories {
         range = CharacterCategoryRange::new(range.low, irange.high, range.categories);
       } else {
@@ -255,7 +256,7 @@ mod tests {
         .unwrap();
     let code_point = "熙".chars().next().unwrap() as u32;
     assert_eq!(
-      CategoryType::KANJI,
+      CategoryType::Kanji,
       category
         .get_category_types(code_point)
         .into_iter()
@@ -302,22 +303,22 @@ mod tests {
     let category = CharacterCategory::read_character_definition(&filename).unwrap();
     assert!(category
       .get_category_types(0x0030)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(category
       .get_category_types(0x0031)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(category
       .get_category_types(0x0032)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(category
       .get_category_types(0x0032)
-      .contains(&CategoryType::KANJI));
+      .contains(&CategoryType::Kanji));
     assert!(category
       .get_category_types(0x0033)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(category
       .get_category_types(0x0039)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
 
     remove_file(&filename).unwrap();
 
@@ -334,25 +335,25 @@ mod tests {
     let category = CharacterCategory::read_character_definition(&filename).unwrap();
     assert!(category
       .get_category_types(0x0030)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(category
       .get_category_types(0x0030)
-      .contains(&CategoryType::KANJI));
+      .contains(&CategoryType::Kanji));
     assert!(category
       .get_category_types(0x0039)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(category
       .get_category_types(0x3007)
-      .contains(&CategoryType::KANJI));
+      .contains(&CategoryType::Kanji));
     assert!(category
       .get_category_types(0x0069)
-      .contains(&CategoryType::DEFAULT));
+      .contains(&CategoryType::Default));
     assert!(category
       .get_category_types(0x0070)
-      .contains(&CategoryType::ALPHA));
+      .contains(&CategoryType::Alpha));
     assert!(category
       .get_category_types(0x0080)
-      .contains(&CategoryType::DEFAULT));
+      .contains(&CategoryType::Default));
 
     remove_file(&filename).unwrap();
 
@@ -372,16 +373,16 @@ mod tests {
     let category = CharacterCategory::read_character_definition(&filename).unwrap();
     assert!(category
       .get_category_types(0x0029)
-      .contains(&CategoryType::DEFAULT));
+      .contains(&CategoryType::Default));
     assert!(category
       .get_category_types(0x0030)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(category
       .get_category_types(0x0030)
-      .contains(&CategoryType::KATAKANA));
+      .contains(&CategoryType::Katakana));
     assert!(category
       .get_category_types(0x0030)
-      .contains(&CategoryType::KANJI));
+      .contains(&CategoryType::Kanji));
 
     remove_file(filename).unwrap();
   }

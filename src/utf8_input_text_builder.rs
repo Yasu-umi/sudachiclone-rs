@@ -6,9 +6,9 @@ use thiserror::Error;
 
 use super::dictionary_lib::category_type::CategoryType;
 use super::dictionary_lib::grammar::{GetCharacterCategory, Grammar};
-use super::utf8_input_text::UTF8InputText;
+use super::utf8_input_text::Utf8InputText;
 
-pub struct UTF8InputTextBuilder<G = Arc<Mutex<Grammar>>> {
+pub struct Utf8InputTextBuilder<G = Arc<Mutex<Grammar>>> {
   grammar: G,
   original_text: String,
   modified_text: String,
@@ -21,9 +21,9 @@ pub enum ReplaceErr {
   RangeErr(String),
 }
 
-impl<G> UTF8InputTextBuilder<G> {
-  pub fn new(text: &str, grammar: G) -> UTF8InputTextBuilder<G> {
-    UTF8InputTextBuilder {
+impl<G> Utf8InputTextBuilder<G> {
+  pub fn new(text: &str, grammar: G) -> Utf8InputTextBuilder<G> {
+    Utf8InputTextBuilder {
       grammar,
       original_text: text.to_string(),
       modified_text: text.to_string(),
@@ -79,8 +79,8 @@ impl<G> UTF8InputTextBuilder<G> {
   }
 }
 
-impl<G: GetCharacterCategory> UTF8InputTextBuilder<Arc<Mutex<G>>> {
-  pub fn build(self) -> UTF8InputText {
+impl<G: GetCharacterCategory> Utf8InputTextBuilder<Arc<Mutex<G>>> {
+  pub fn build(self) -> Utf8InputText {
     let modified_text = self.get_text();
     let bytes = modified_text.clone().into_bytes();
     let len = bytes.len();
@@ -104,7 +104,7 @@ impl<G: GetCharacterCategory> UTF8InputTextBuilder<Arc<Mutex<G>>> {
       get_char_category_continuities(&modified_text, &char_categories);
     let can_bow_list = build_can_bow_list(&modified_text, &char_categories);
 
-    UTF8InputText::new(
+    Utf8InputText::new(
       self.original_text,
       modified_text,
       bytes,
@@ -142,9 +142,9 @@ fn build_can_bow_list(text: &str, char_categories: &[HashSet<CategoryType>]) -> 
       can_bow_list.push(true);
       continue;
     }
-    if cat.contains(&CategoryType::ALPHA)
-      || cat.contains(&CategoryType::GREEK)
-      || cat.contains(&CategoryType::CYRILLIC)
+    if cat.contains(&CategoryType::Alpha)
+      || cat.contains(&CategoryType::Greek)
+      || cat.contains(&CategoryType::Cyrillic)
     {
       can_bow_list.push(cat.intersection(&char_categories[i - 1]).next().is_none());
       continue;
@@ -229,7 +229,7 @@ mod tests {
     }
   }
 
-  fn build_builder() -> UTF8InputTextBuilder<Arc<Mutex<MockGrammar>>> {
+  fn build_builder() -> Utf8InputTextBuilder<Arc<Mutex<MockGrammar>>> {
     let character_category = CharacterCategory::read_character_definition(
       PathBuf::from_str(file!())
         .unwrap()
@@ -240,7 +240,7 @@ mod tests {
     .unwrap();
     let mut grammar = MockGrammar::new();
     grammar.set_character_category(Some(character_category));
-    UTF8InputTextBuilder::new(TEXT, Arc::new(Mutex::new(grammar)))
+    Utf8InputTextBuilder::new(TEXT, Arc::new(Mutex::new(grammar)))
   }
 
   #[test]
@@ -286,46 +286,46 @@ mod tests {
     let input = builder.build();
     assert!(input
       .get_char_category_types(0, None)
-      .contains(&CategoryType::ALPHA));
+      .contains(&CategoryType::Alpha));
     assert!(input
       .get_char_category_types(2, None)
-      .contains(&CategoryType::ALPHA));
+      .contains(&CategoryType::Alpha));
     assert!(input
       .get_char_category_types(5, None)
-      .contains(&CategoryType::ALPHA));
+      .contains(&CategoryType::Alpha));
     assert!(input
       .get_char_category_types(6, None)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(input
       .get_char_category_types(7, None)
-      .contains(&CategoryType::HIRAGANA));
+      .contains(&CategoryType::Hiragana));
     assert!(input
       .get_char_category_types(9, None)
-      .contains(&CategoryType::HIRAGANA));
+      .contains(&CategoryType::Hiragana));
     assert!(input
       .get_char_category_types(10, None)
-      .contains(&CategoryType::NUMERIC));
+      .contains(&CategoryType::Numeric));
     assert!(input
       .get_char_category_types(13, None)
-      .contains(&CategoryType::KANJI));
+      .contains(&CategoryType::Kanji));
     assert!(input
       .get_char_category_types(18, None)
-      .contains(&CategoryType::KANJI));
+      .contains(&CategoryType::Kanji));
     assert!(input
       .get_char_category_types(19, None)
-      .contains(&CategoryType::DEFAULT));
+      .contains(&CategoryType::Default));
     assert!(input
       .get_char_category_types(22, None)
-      .contains(&CategoryType::DEFAULT));
+      .contains(&CategoryType::Default));
     assert!(input
       .get_char_category_types(23, None)
-      .contains(&CategoryType::KATAKANA));
+      .contains(&CategoryType::Katakana));
     assert!(input
       .get_char_category_types(26, None)
-      .contains(&CategoryType::KATAKANA));
+      .contains(&CategoryType::Katakana));
     assert!(input
       .get_char_category_types(31, None)
-      .contains(&CategoryType::KATAKANA));
+      .contains(&CategoryType::Katakana));
   }
 
   #[test]

@@ -4,17 +4,17 @@ use super::dictionary_lib::grammar::Grammar;
 use super::dictionary_lib::word_info::WordInfo;
 use super::lattice_node::LatticeNode;
 use super::morpheme::Morpheme;
-use super::utf8_input_text::UTF8InputText;
+use super::utf8_input_text::Utf8InputText;
 
 pub struct MorphemeList {
-  input_text: Arc<Mutex<UTF8InputText>>,
+  input_text: Arc<Mutex<Utf8InputText>>,
   grammar: Arc<Mutex<Grammar>>,
   path: Vec<Arc<Mutex<LatticeNode>>>,
 }
 
 impl MorphemeList {
   pub fn new(
-    input_text: UTF8InputText,
+    input_text: Utf8InputText,
     grammar: Arc<Mutex<Grammar>>,
     path: Vec<Arc<Mutex<LatticeNode>>>,
   ) -> MorphemeList {

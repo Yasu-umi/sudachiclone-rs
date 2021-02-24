@@ -1,6 +1,6 @@
 use std::char::from_u32;
 use std::collections::HashMap;
-use std::io::{BufRead, Cursor, Error as IOError, Seek, SeekFrom, Write};
+use std::io::{BufRead, Cursor, Error as IoError, Seek, SeekFrom, Write};
 use std::num::ParseIntError;
 use std::str::FromStr;
 
@@ -66,11 +66,11 @@ pub enum DictionaryBuilderErr {
   #[error("invalid word id")]
   InvalidWordIdErr,
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
   #[error("{0}")]
-  CSVError(#[from] csv::Error),
+  CsvError(#[from] csv::Error),
   #[error("{0}")]
   RegexError(#[from] RegexError),
   #[error("{0}")]
@@ -134,7 +134,7 @@ impl DictionaryBuilder {
   ) -> Result<(), DictionaryBuilderErr> {
     let row = match record {
       Ok(r) => r.into_iter().map(|c| c.to_string()).collect(),
-      Err(e) => return Err(DictionaryBuilderErr::CSVError(e)),
+      Err(e) => return Err(DictionaryBuilderErr::CsvError(e)),
     };
 
     let entry = match self.parse_line(row) {
@@ -270,7 +270,7 @@ impl DictionaryBuilder {
           matrix.write_i16(cost)?;
           matrix.set_position(pos);
         }
-        Err(e) => return Err(DictionaryBuilderErr::IOError(e)),
+        Err(e) => return Err(DictionaryBuilderErr::IoError(e)),
       }
     }
     matrix.pipe_all(writer)?;

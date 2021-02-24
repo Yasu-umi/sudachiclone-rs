@@ -1,4 +1,4 @@
-use std::io::{BufRead, Cursor, Error as IOError, Seek, SeekFrom, Write};
+use std::io::{BufRead, Cursor, Error as IoError, Seek, SeekFrom, Write};
 use std::string::FromUtf8Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,7 +21,7 @@ pub enum DictionaryHeaderErr {
   #[error("description is too long")]
   DescriptionTooLongErr,
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("{0}")]
   FromUtf8Error(#[from] FromUtf8Error),
 }

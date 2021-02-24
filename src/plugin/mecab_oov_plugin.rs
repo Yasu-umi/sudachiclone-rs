@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Error as IOError};
+use std::io::{BufRead, BufReader, Error as IoError};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -58,7 +58,7 @@ pub enum MecabOovPluginSetupErr {
   #[error("unkDef is not defined")]
   UnkDefNotDefinedErr,
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("{0}")]
   ParseIntError(#[from] ParseIntError),
   #[error("invalid format at line {0} in char.def")]
@@ -341,9 +341,9 @@ mod tests {
     };
     plugin
       .oovs_list
-      .insert(CategoryType::KANJI, vec![Oov::new(0, 0, 0, Some(1))]);
+      .insert(CategoryType::Kanji, vec![Oov::new(0, 0, 0, Some(1))]);
     plugin.oovs_list.insert(
-      CategoryType::KANJINUMERIC,
+      CategoryType::KanjiNumeric,
       vec![Oov::new(0, 0, 0, Some(1)), Oov::new(0, 0, 0, Some(2))],
     );
     plugin
@@ -354,7 +354,7 @@ mod tests {
       text: String::from("あいうえお"),
       types: vec![HashSet::new(); 5],
     };
-    mocked_input_text.set_category_type(0, 3, CategoryType::KANJI);
+    mocked_input_text.set_category_type(0, 3, CategoryType::Kanji);
     mocked_input_text
   }
 
@@ -366,7 +366,7 @@ mod tests {
       is_invoke: false,
       length: 0,
     };
-    plugin.categories.insert(CategoryType::KANJI, category_info);
+    plugin.categories.insert(CategoryType::Kanji, category_info);
     let mocked_input_text = build_mocked_input_text();
 
     let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
@@ -383,7 +383,7 @@ mod tests {
       is_invoke: true,
       length: 0,
     };
-    plugin.categories.insert(CategoryType::KANJI, category_info);
+    plugin.categories.insert(CategoryType::Kanji, category_info);
     let mocked_input_text = build_mocked_input_text();
 
     let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
@@ -400,7 +400,7 @@ mod tests {
       is_invoke: false,
       length: 0,
     };
-    plugin.categories.insert(CategoryType::KANJI, category_info);
+    plugin.categories.insert(CategoryType::Kanji, category_info);
     let mocked_input_text = build_mocked_input_text();
 
     let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
@@ -423,7 +423,7 @@ mod tests {
       is_invoke: true,
       length: 0,
     };
-    plugin.categories.insert(CategoryType::KANJI, category_info);
+    plugin.categories.insert(CategoryType::Kanji, category_info);
     let mocked_input_text = build_mocked_input_text();
 
     let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
@@ -446,7 +446,7 @@ mod tests {
       is_invoke: false,
       length: 2,
     };
-    plugin.categories.insert(CategoryType::KANJI, category_info);
+    plugin.categories.insert(CategoryType::Kanji, category_info);
     let mocked_input_text = build_mocked_input_text();
 
     let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
@@ -474,7 +474,7 @@ mod tests {
       is_invoke: false,
       length: 2,
     };
-    plugin.categories.insert(CategoryType::KANJI, category_info);
+    plugin.categories.insert(CategoryType::Kanji, category_info);
     let mocked_input_text = build_mocked_input_text();
 
     let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);
@@ -507,7 +507,7 @@ mod tests {
       is_invoke: true,
       length: 2,
     };
-    plugin.categories.insert(CategoryType::KANJI, category_info);
+    plugin.categories.insert(CategoryType::Kanji, category_info);
     let mocked_input_text = build_mocked_input_text();
 
     let nodes = (&plugin).provide_oov(&mocked_input_text, 0, false);

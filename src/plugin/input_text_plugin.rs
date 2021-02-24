@@ -4,7 +4,7 @@ use thiserror::Error;
 use super::default_input_text_plugin::{DefaultInputTextPlugin, DefaultInputTextPluginSetupErr};
 use super::prolonged_soundmark_input_text_plugin::ProlongedSoundMarkInputTextPlugin;
 use crate::config::Config;
-use crate::utf8_input_text_builder::{ReplaceErr, UTF8InputTextBuilder};
+use crate::utf8_input_text_builder::{ReplaceErr, Utf8InputTextBuilder};
 
 pub enum InputTextPlugin {
   DefaultInputTextPlugin(DefaultInputTextPlugin),
@@ -14,14 +14,14 @@ pub enum InputTextPlugin {
 pub trait RewriteInputText {
   fn rewrite<G>(
     &self,
-    builder: &mut UTF8InputTextBuilder<G>,
+    builder: &mut Utf8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr>;
 }
 
 impl RewriteInputText for InputTextPlugin {
   fn rewrite<G>(
     &self,
-    builder: &mut UTF8InputTextBuilder<G>,
+    builder: &mut Utf8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr> {
     match self {
       InputTextPlugin::DefaultInputTextPlugin(plugin) => plugin.rewrite(builder),

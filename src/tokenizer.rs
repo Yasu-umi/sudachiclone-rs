@@ -12,8 +12,8 @@ use super::morpheme_list::MorphemeList;
 use super::plugin::input_text_plugin::{InputTextPlugin, RewriteInputText};
 use super::plugin::oov_provider_plugin::{get_oov, OovProviderPlugin};
 use super::plugin::path_rewrite_plugin::{PathRewritePlugin, RewritePath};
-use super::utf8_input_text::{InputText, UTF8InputText};
-use super::utf8_input_text_builder::UTF8InputTextBuilder;
+use super::utf8_input_text::{InputText, Utf8InputText};
+use super::utf8_input_text_builder::Utf8InputTextBuilder;
 
 /// Able to tokenize Japanese text
 pub trait CanTokenize {
@@ -65,7 +65,7 @@ impl Tokenizer {
       path_rewrite_plugins,
     }
   }
-  fn build_lattice(&self, input: &UTF8InputText) -> Lattice {
+  fn build_lattice(&self, input: &Utf8InputText) -> Lattice {
     let mut lattice = Lattice::new(Arc::clone(&self.grammar));
     let bytes = input.get_byte_text();
     let len = bytes.len();
@@ -93,7 +93,7 @@ impl Tokenizer {
       // OOV
       if !input
         .get_char_category_types(i, None)
-        .contains(&CategoryType::NOOOVBOW)
+        .contains(&CategoryType::Nooovbow)
       {
         for oov_plugin in self.oov_provider_plugins.iter() {
           process_oov(oov_plugin.deref(), input, i, &mut has_words, &mut lattice);
@@ -105,7 +105,7 @@ impl Tokenizer {
         }
       }
       if !has_words {
-        panic!(format!("there is no morpheme at {}", i));
+        panic!("there is no morpheme at {}", i);
       }
     }
     lattice.connect_eos_node();
@@ -175,7 +175,7 @@ impl CanTokenize for Tokenizer {
     }
 
     let mode = mode.unwrap_or(SplitMode::C);
-    let mut builder = UTF8InputTextBuilder::new(text.as_ref(), Arc::clone(&self.grammar));
+    let mut builder = Utf8InputTextBuilder::new(text.as_ref(), Arc::clone(&self.grammar));
     for plugin in self.input_text_plugins.iter() {
       if plugin.rewrite(&mut builder).is_err() {
         return None;
@@ -208,7 +208,7 @@ impl CanTokenize for Tokenizer {
 
 fn process_oov(
   oov_plugin: &OovProviderPlugin,
-  input: &UTF8InputText,
+  input: &Utf8InputText,
   i: usize,
   has_words: &mut bool,
   lattice: &mut Lattice,

@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufRead, BufReader, Error as IOError, Seek};
+use std::io::{BufRead, BufReader, Error as IoError, Seek};
 use std::path::Path;
 
 use thiserror::Error;
@@ -23,7 +23,7 @@ pub enum ReadDictionaryErr {
   #[error("not found grammar")]
   NotFoundGrammarErr,
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("{0}")]
   DictionaryHeaderErr(#[from] DictionaryHeaderErr),
   #[error("{0}")]

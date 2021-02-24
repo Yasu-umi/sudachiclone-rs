@@ -12,7 +12,7 @@ pub enum InputTextErr {
   FailedSubstringErr(String),
 }
 
-pub struct UTF8InputText {
+pub struct Utf8InputText {
   original_text: String,
   modified_text: String,
   bytes: Vec<u8>,
@@ -31,7 +31,7 @@ pub trait InputText {
   fn get_word_candidate_length(&self, index: usize) -> usize;
 }
 
-impl UTF8InputText {
+impl Utf8InputText {
   pub fn new(
     original_text: String,
     modified_text: String,
@@ -41,8 +41,8 @@ impl UTF8InputText {
     char_categories: Vec<HashSet<CategoryType>>,
     char_category_continuities: Vec<usize>,
     can_bow_list: Vec<bool>,
-  ) -> UTF8InputText {
-    UTF8InputText {
+  ) -> Utf8InputText {
+    Utf8InputText {
       original_text,
       modified_text,
       bytes,
@@ -79,7 +79,7 @@ impl UTF8InputText {
   }
 }
 
-impl InputText for UTF8InputText {
+impl InputText for Utf8InputText {
   fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, InputTextErr> {
     if end > self.bytes.len() {
       return Err(InputTextErr::FailedSubstringErr(String::from("end > self.bytes.len()")));
@@ -108,7 +108,7 @@ impl InputText for UTF8InputText {
       Some(end) => {
         if start + self.get_char_category_continuous_length(start) < end {
           let mut set = HashSet::new();
-          set.insert(CategoryType::DEFAULT);
+          set.insert(CategoryType::Default);
           return set;
         }
         let start = self.get_offset_text_length(start);

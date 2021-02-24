@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use serde_json::Value;
 
 use super::input_text_plugin::{InputTextPluginReplaceErr, RewriteInputText};
-use crate::utf8_input_text_builder::UTF8InputTextBuilder;
+use crate::utf8_input_text_builder::Utf8InputTextBuilder;
 
 #[derive(Debug)]
 pub struct ProlongedSoundMarkInputTextPlugin {
@@ -14,7 +14,7 @@ pub struct ProlongedSoundMarkInputTextPlugin {
 impl RewriteInputText for &ProlongedSoundMarkInputTextPlugin {
   fn rewrite<G>(
     &self,
-    builder: &mut UTF8InputTextBuilder<G>,
+    builder: &mut Utf8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr> {
     let text = builder.get_text();
     let n = text.chars().count();
@@ -116,7 +116,7 @@ mod tests {
     let original = "ゴーール";
     let normalized = "ゴール";
     let plugin = &build_plugin();
-    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
+    let mut builder = Utf8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -140,7 +140,7 @@ mod tests {
     let original = "スーパーー";
     let normalized = "スーパー";
     let plugin = &build_plugin();
-    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
+    let mut builder = Utf8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -165,7 +165,7 @@ mod tests {
     let original = "エーービーーーシーーーー";
     let normalized = "エービーシー";
     let plugin = &build_plugin();
-    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
+    let mut builder = Utf8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 
@@ -195,7 +195,7 @@ mod tests {
     let original = "エーービ〜〜〜シ〰〰〰〰";
     let normalized = "エービーシー";
     let plugin = &build_plugin();
-    let mut builder = UTF8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
+    let mut builder = Utf8InputTextBuilder::new(original, Arc::new(Mutex::new(MockGrammar::new())));
     plugin.rewrite(&mut builder).unwrap();
     let text = builder.build();
 

@@ -1,4 +1,4 @@
-use std::io::{BufRead, Error as IOError};
+use std::io::{BufRead, Error as IoError};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -7,7 +7,7 @@ pub struct WordIdTable {
 }
 
 impl WordIdTable {
-  pub fn from_reader<R: BufRead>(reader: &mut R) -> Result<WordIdTable, IOError> {
+  pub fn from_reader<R: BufRead>(reader: &mut R) -> Result<WordIdTable, IoError> {
     let size = reader.read_u32::<LittleEndian>()? as usize;
     let mut bytes = vec![0u8; size];
     reader.read_exact(&mut bytes)?;

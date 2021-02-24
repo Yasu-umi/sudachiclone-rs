@@ -8,14 +8,14 @@ use super::simple_oov_plugin::{SimpleOovPlugin, SimpleOovPluginSetupErr};
 use crate::config::Config;
 use crate::dictionary_lib::grammar::Grammar;
 use crate::lattice_node::LatticeNode;
-use crate::utf8_input_text::{InputText, UTF8InputText};
+use crate::utf8_input_text::{InputText, Utf8InputText};
 
 pub enum OovProviderPlugin {
   MecabOovPlugin(MecabOovPlugin),
   SimpleOovPlugin(SimpleOovPlugin),
 }
 
-pub trait ProvideOov<T: InputText = UTF8InputText> {
+pub trait ProvideOov<T: InputText = Utf8InputText> {
   fn provide_oov(
     &self,
     input_text: &T,

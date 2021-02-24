@@ -1,5 +1,5 @@
 use std::io::Cursor;
-use std::io::{BufRead, Error as IOError, Seek, SeekFrom};
+use std::io::{BufRead, Error as IoError, Seek, SeekFrom};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use encoding_rs::UTF_16LE;
@@ -16,7 +16,7 @@ impl WordInfoList {
   pub fn from_reader<R: BufRead + Seek>(
     reader: &mut R,
     word_size: usize,
-  ) -> Result<WordInfoList, IOError> {
+  ) -> Result<WordInfoList, IoError> {
     let offset = reader.seek(SeekFrom::Current(0))? as usize;
     let mut bytes = vec![];
     reader.read_to_end(&mut bytes)?;

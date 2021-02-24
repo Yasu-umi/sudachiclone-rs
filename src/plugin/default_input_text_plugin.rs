@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Error as IOError};
+use std::io::{BufRead, BufReader, Error as IoError};
 use std::path::Path;
 
 use thiserror::Error;
@@ -10,7 +10,7 @@ use unicode_normalization::UnicodeNormalization;
 
 use super::input_text_plugin::{InputTextPluginReplaceErr, RewriteInputText};
 use crate::config::Config;
-use crate::utf8_input_text_builder::UTF8InputTextBuilder;
+use crate::utf8_input_text_builder::Utf8InputTextBuilder;
 
 type KeyLengths = HashMap<char, usize>;
 type ReplaceCharMap = HashMap<Vec<u8>, String>;
@@ -25,7 +25,7 @@ pub struct DefaultInputTextPlugin {
 impl RewriteInputText for DefaultInputTextPlugin {
   fn rewrite<G>(
     &self,
-    builder: &mut UTF8InputTextBuilder<G>,
+    builder: &mut Utf8InputTextBuilder<G>,
   ) -> Result<(), InputTextPluginReplaceErr> {
     let mut offset: i32 = 0;
     let mut next_offset: i32 = 0;
@@ -104,7 +104,7 @@ pub enum DefaultInputTextPluginSetupErr {
   #[error("invalid format at line {0}")]
   InvalidFormatErr(usize),
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("{0}")]
   Infallible(#[from] Infallible),
 }
@@ -215,11 +215,11 @@ mod tests {
   }
 
   fn setup() -> (
-    UTF8InputTextBuilder<CelledMockGrammar>,
+    Utf8InputTextBuilder<CelledMockGrammar>,
     DefaultInputTextPlugin,
   ) {
     let builder =
-      UTF8InputTextBuilder::new(ORIGINAL_TEXT, Arc::new(Mutex::new(MockGrammar::new())));
+      Utf8InputTextBuilder::new(ORIGINAL_TEXT, Arc::new(Mutex::new(MockGrammar::new())));
     let mut config = Config::empty().unwrap();
     config.resource_dir = PathBuf::from_str(file!())
       .unwrap()

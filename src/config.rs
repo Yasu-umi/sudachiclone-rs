@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::ffi::OsStr;
 use std::fs::{symlink_metadata, File};
-use std::io::{BufReader, Error as IOError, ErrorKind as IOErrorKind, Read, Write};
+use std::io::{BufReader, Error as IoError, ErrorKind as IoErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
@@ -19,15 +19,15 @@ const SUDACHIDICT_FULL_PKG_NAME: &str = "sudachidict_full";
 const SUDACHIDICT_SMALL_PKG_NAME: &str = "sudachidict_small";
 
 #[cfg(not(any(target_os = "redox", unix, windows)))]
-fn remove_symlink_dir<P: AsRef<Path>>(_path: P) -> Result<(), IOError> {
-  Err(IOError::new(
-    IOErrorKind::Other,
+fn remove_symlink_dir<P: AsRef<Path>>(_path: P) -> Result<(), IoError> {
+  Err(IoError::new(
+    IoErrorKind::Other,
     "can't call remove_symlink_dir",
   ))
 }
 #[cfg(not(any(target_os = "redox", unix, windows)))]
-fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(_src: P, _dst: Q) -> Result<(), IOError> {
-  Err(IOError::new(IOErrorKind::Other, "can't call symlink_dir"))
+fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(_src: P, _dst: Q) -> Result<(), IoError> {
+  Err(IoError::new(IoErrorKind::Other, "can't call symlink_dir"))
 }
 
 use super::resources;
@@ -35,7 +35,7 @@ use super::resources;
 #[derive(Error, Debug)]
 pub enum ConfigErr {
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("{0}")]
   SerdeError(#[from] SerdeError),
   #[error("{0}")]
@@ -143,8 +143,8 @@ impl Config {
   }
 }
 
-fn ok_or_io_err<T>(t: Option<T>, err: &str) -> Result<T, IOError> {
-  t.ok_or_else(|| IOError::new(IOErrorKind::Other, err))
+fn ok_or_io_err<T>(t: Option<T>, err: &str) -> Result<T, IoError> {
+  t.ok_or_else(|| IoError::new(IoErrorKind::Other, err))
 }
 
 #[derive(Error, Debug)]
@@ -154,7 +154,7 @@ pub enum SudachiDictErr {
   #[error("{0}")]
   FromUtf8Error(#[from] FromUtf8Error),
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
   #[error("`systemDict` must be specified if `SudachiDict_core` not installed")]
   NotFoundSudachiDictCoreErr,
   #[error("Multiple packages of `SudachiDict_*` installed. Set default dict with link command.")]
@@ -199,7 +199,7 @@ exit()
       String::from_utf8_lossy(&output.stdout),
       String::from_utf8_lossy(&output.stderr)
     );
-    Err(IOError::new(IOErrorKind::NotFound, "Python process failed").into())
+    Err(IoError::new(IoErrorKind::NotFound, "Python process failed").into())
   }
 }
 
@@ -220,7 +220,7 @@ fn get_python_package_path(
     }
   }
   error!("Unable to find valid python installation");
-  Err(IOError::new(IOErrorKind::NotFound, "No valid python installation found").into())
+  Err(IoError::new(IoErrorKind::NotFound, "No valid python installation found").into())
 }
 
 fn success_import(python_exe: Option<&OsStr>, pkg_name: &str) -> bool {

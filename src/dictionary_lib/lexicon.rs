@@ -1,4 +1,4 @@
-use std::io::Error as IOError;
+use std::io::Error as IoError;
 
 use thiserror::Error;
 
@@ -31,5 +31,5 @@ pub enum LexiconErr {
   #[error("not found word id")]
   NotFoundWordIdErr,
   #[error("{0}")]
-  IOError(#[from] IOError),
+  IoError(#[from] IoError),
 }

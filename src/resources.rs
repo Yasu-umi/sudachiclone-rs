@@ -1,8 +1,8 @@
 use std::fs::{create_dir_all, File};
-use std::io::{Error as IOError, Write};
+use std::io::{Error as IoError, Write};
 use std::path::Path;
 
-pub fn write_sudachi_json<P: AsRef<Path>>(path: P) -> Result<(), IOError> {
+pub fn write_sudachi_json<P: AsRef<Path>>(path: P) -> Result<(), IoError> {
   let path = path.as_ref();
   if !path.exists() {
     if let Some(p) = path.parent() {
@@ -16,7 +16,7 @@ pub fn write_sudachi_json<P: AsRef<Path>>(path: P) -> Result<(), IOError> {
   }
 }
 
-pub fn write_resources<P: AsRef<Path>>(dir: P) -> Result<(), IOError> {
+pub fn write_resources<P: AsRef<Path>>(dir: P) -> Result<(), IoError> {
   let dir = dir.as_ref();
   if !dir.join("char.def").exists() {
     File::create(dir.join("char.def"))?.write_all(CHAR_DEF.as_bytes())?;
