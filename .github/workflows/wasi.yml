@@ -38,7 +38,7 @@ jobs:
         run: "curl https://wasmtime.dev/install.sh -sSf | bash"
 
       - name: Add wasmtime to PATH
-        run: echo "::add-path::$HOME/.wasmtime/bin"
+        run: echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
 
       - name: Install cargo-wasi command
         uses: actions-rs/cargo@v1
