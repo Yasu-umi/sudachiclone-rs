@@ -272,6 +272,8 @@ impl<T: InputText> ProvideOov<T> for &MecabOovPlugin {
 
 #[cfg(test)]
 mod tests {
+  use crate::utf8_input_text::InputTextErr;
+
   use super::*;
   use std::borrow::Cow;
   use std::cmp::min;
@@ -314,7 +316,7 @@ mod tests {
         self.types[start].clone()
       }
     }
-    fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, ()> {
+    fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, InputTextErr> {
       Ok(
         self
           .text

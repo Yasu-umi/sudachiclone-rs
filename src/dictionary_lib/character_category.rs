@@ -2,7 +2,6 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IOError};
-use std::iter::FromIterator;
 use std::num::ParseIntError;
 use std::path::Path;
 use std::str::FromStr;
@@ -125,7 +124,7 @@ impl CharacterCategory {
             new_range_list.push(CharacterCategoryRange::new(
               pivot,
               left_end,
-              HashSet::from_iter(states.iter().cloned()),
+              states.iter().cloned().collect(),
             ));
             pivot = left_end;
             for category in left.categories.iter() {
@@ -138,7 +137,7 @@ impl CharacterCategory {
             new_range_list.push(CharacterCategoryRange::new(
               pivot,
               right_start,
-              HashSet::from_iter(states.iter().cloned()),
+              states.iter().cloned().collect(),
             ));
             pivot = right_start;
             if let Some(right) = right {

@@ -43,7 +43,7 @@ impl PosTable {
       .table
       .iter()
       .position(|t| t == text)
-      .ok_or_else(|| DictionaryBuilderErr::InvalidFormatErr)
+      .ok_or(DictionaryBuilderErr::InvalidFormatErr)
   }
   fn mut_get_id(&mut self, text: &str) -> usize {
     match self.table.iter().position(|t| t == text) {
@@ -454,9 +454,9 @@ impl DictionaryBuilder {
     writer: &mut W,
     text: &str,
   ) -> Result<(), DictionaryBuilderErr> {
-    let mut len = 0 as u32;
+    let mut len = 0_u32;
     for c in text.chars().map(|c| c as u32) {
-      len += if 0x10000 <= c && c <= 0x0010_FFFF {
+      len += if (0x10000..=0x0010_FFFF).contains(&c) {
         2
       } else {
         1
@@ -513,8 +513,8 @@ impl IdParser for DictionaryBuilder {
 }
 
 pub fn parse_id<T: IdParser>(this: &T, text: &str) -> Result<u32, DictionaryBuilderErr> {
-  let id = if text.starts_with('U') {
-    let mut id = u32::from_str(&text[1..])?;
+  let id = if let Some(stripped) = text.strip_prefix('U') {
+    let mut id = u32::from_str(&stripped)?;
     if this.is_user_dictionary() {
       id |= 1 << 28;
     }

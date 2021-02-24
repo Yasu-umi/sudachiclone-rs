@@ -2,7 +2,15 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ops::Range;
 
+use thiserror::Error;
+
 use super::dictionary_lib::category_type::CategoryType;
+
+#[derive(Error, Debug)]
+pub enum InputTextErr {
+  #[error("{0}")]
+  FailedSubstringErr(String),
+}
 
 pub struct UTF8InputText {
   original_text: String,
@@ -18,7 +26,7 @@ pub struct UTF8InputText {
 pub trait InputText {
   fn get_char_category_continuous_length(&self, index: usize) -> usize;
   fn get_char_category_types(&self, start: usize, end: Option<usize>) -> HashSet<CategoryType>;
-  fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, ()>;
+  fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, InputTextErr>;
   fn get_code_points_offset_length(&self, index: usize, code_point_offset: usize) -> usize;
   fn get_word_candidate_length(&self, index: usize) -> usize;
 }
@@ -72,12 +80,12 @@ impl UTF8InputText {
 }
 
 impl InputText for UTF8InputText {
-  fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, ()> {
+  fn get_substring(&self, start: usize, end: usize) -> Result<Cow<str>, InputTextErr> {
     if end > self.bytes.len() {
-      return Err(());
+      return Err(InputTextErr::FailedSubstringErr(String::from("end > self.bytes.len()")));
     }
     if start > end {
-      return Err(());
+      return Err(InputTextErr::FailedSubstringErr(String::from("start > end")));
     }
     Ok(Cow::Borrowed(self.modified_text.get(start..end).unwrap()))
   }
