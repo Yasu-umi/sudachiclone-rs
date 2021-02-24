@@ -21,7 +21,7 @@ $ cargo install sudachiclone
 The default dict package SudachiDict_core is distributed from WorksAppliations Download site. Run pip install like below:
 
 ```bash
-$ pip install https://object-storage.tyo2.conoha.io/v1/nc_2520839e1f9641b08211a5c85243124a/sudachi/SudachiDict_core-20200127.tar.gz
+$ pip install https://files.pythonhosted.org/packages/e4/b9/ae63802ffa1cbeca5b984a6ff8afcb70e30448b897feb74904a068897ebc/SudachiDict-core-20201223.post1.tar.gz
 ```
 
 ## Usage CLI
